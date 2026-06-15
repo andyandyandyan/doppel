@@ -10,12 +10,11 @@ const HELP_KEY = 'doppel-help-seen';
 // ─── Demo data for help screens ───────────────────────────────────────────────
 const DP1 = 'KEVIN BACON';
 const DP2 = 'BRIE LARSON';
-// Common: O(9), N(10). Spaces: DP1[5], DP2[4]
-const DR1 = new Set([5, 9, 10]);
-const DR2 = new Set([4, 9, 10]);
+const DR1 = new Set([5, 9, 10]); // space(5), O(9), N(10)
+const DR2 = new Set([4, 9, 10]); // space(4), O(9), N(10)
 
 // ─── Mini display components ──────────────────────────────────────────────────
-function MiniSlot({ ch, state, fadeDuration = '0.3s' }) {
+function MiniSlot({ ch, state }) {
   const rev = state === 'revealed';
   const slot = state === 'slot';
   return (
@@ -26,19 +25,19 @@ function MiniSlot({ ch, state, fadeDuration = '0.3s' }) {
       fontFamily: "'DM Mono',monospace", fontSize: '0.72rem', fontWeight: 500,
       color: rev ? 'var(--accent)' : 'var(--text)',
       opacity: state === 'hidden' ? 0 : 1,
-      transition: `opacity ${fadeDuration}, color 0.3s, border-color 0.3s`,
+      transition: 'opacity 0.3s, color 0.3s, border-color 0.3s',
       userSelect: 'none',
     }}>{slot ? '' : ch}</div>
   );
 }
 
-function MiniPhrase({ phrase, getState, fadeDuration }) {
+function MiniPhrase({ phrase, getState }) {
   return (
     <div style={{ display: 'flex', gap: 2, alignItems: 'flex-end' }}>
       {phrase.split('').map((ch, i) =>
         ch === ' '
           ? <div key={i} style={{ width: 22, flexShrink: 0 }} />
-          : <MiniSlot key={i} ch={ch} state={getState(i)} fadeDuration={fadeDuration} />
+          : <MiniSlot key={i} ch={ch} state={getState(i)} />
       )}
     </div>
   );
@@ -61,18 +60,14 @@ function MiniTile({ ch, state }) {
   );
 }
 
-const DemoTitle = () => (
-  <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '1rem', color: 'var(--dim)', marginBottom: 8 }}>
-    "they are what we eat"
-  </div>
-);
-
 // ─── Help animations ──────────────────────────────────────────────────────────
 function HelpAnim1() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      <DemoTitle />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '1rem', color: 'var(--dim)', marginBottom: 10 }}>
+        "they are what we eat"
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <MiniPhrase phrase={DP1} getState={() => 'plain'} />
         <MiniPhrase phrase={DP2} getState={() => 'plain'} />
       </div>
@@ -80,35 +75,74 @@ function HelpAnim1() {
   );
 }
 
-function HelpAnim2() {
-  const [faded, setFaded] = useState(false);
+function HelpAnim2({ active }) {
   const [cycle, setCycle] = useState(0);
+  const containerRef = useRef(null);
+
   useEffect(() => {
-    setFaded(false);
-    const t1 = setTimeout(() => setFaded(true), 800);
-    const t2 = setTimeout(() => setCycle(c => c + 1), 4000);
+    if (!active) return;
+
+    // Reset all fadeable slots to visible
+    const slots = containerRef.current?.querySelectorAll('[data-f]');
+    slots?.forEach(el => {
+      el.style.transition = 'opacity 0.3s';
+      el.style.opacity = '1';
+    });
+
+    const t1 = setTimeout(() => {
+      slots?.forEach(el => {
+        el.style.transition = 'opacity 1.1s ease';
+        el.style.opacity = '0';
+      });
+    }, 900);
+
+    const t2 = setTimeout(() => setCycle(c => c + 1), 4500);
     return () => { clearTimeout(t1); clearTimeout(t2); };
-  }, [cycle]);
-  const s1 = i => !faded ? 'plain' : (i === 9 || i === 10) ? 'plain' : 'hidden';
-  const s2 = i => !faded ? 'plain' : (i === 9 || i === 10) ? 'plain' : 'hidden';
+  }, [cycle, active]);
+
+  // Build the two phrase rows with direct refs on fadeable letters
+  const slotStyle = {
+    width: 22, height: 30, flexShrink: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    borderBottom: '2px solid var(--border)',
+    fontFamily: "'DM Mono',monospace", fontSize: '0.72rem', fontWeight: 500,
+    color: 'var(--text)', userSelect: 'none',
+  };
+
+  const renderPhrase = (phrase) => (
+    <div style={{ display: 'flex', gap: 2, alignItems: 'flex-end' }}>
+      {phrase.split('').map((ch, i) =>
+        ch === ' '
+          ? <div key={i} style={{ width: 22, flexShrink: 0 }} />
+          : <div key={i} style={slotStyle}
+              data-f={i !== 9 && i !== 10 ? 'true' : undefined}>
+              {ch}
+            </div>
+      )}
+    </div>
+  );
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+    <div ref={containerRef} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <MiniPhrase phrase={DP1} getState={s1} fadeDuration="1.1s" />
-        <MiniPhrase phrase={DP2} getState={s2} fadeDuration="1.1s" />
+        {renderPhrase(DP1)}
+        {renderPhrase(DP2)}
       </div>
     </div>
   );
 }
 
-function HelpAnim3() {
+function HelpAnim3({ active }) {
+  const TILES = ['A', 'B', 'R', 'E', 'L'];
   const [rev1, setRev1] = useState(new Set(DR1));
   const [rev2, setRev2] = useState(new Set(DR2));
-  const [tiles, setTiles] = useState({ B: 'normal', R: 'normal', E: 'normal' });
+  const [tiles, setTiles] = useState({ A: 'normal', B: 'normal', R: 'normal', E: 'normal', L: 'normal' });
   const [cycle, setCycle] = useState(0);
+
   useEffect(() => {
+    if (!active) return;
     setRev1(new Set(DR1)); setRev2(new Set(DR2));
-    setTiles({ B: 'normal', R: 'normal', E: 'normal' });
+    setTiles({ A: 'normal', B: 'normal', R: 'normal', E: 'normal', L: 'normal' });
     const ts = []; const t = (ms, fn) => ts.push(setTimeout(fn, ms));
     t(500,  () => setTiles(s => ({ ...s, B: 'pending' })));
     t(1000, () => { setTiles(s => ({ ...s, B: 'done' })); setRev1(s => new Set([...s, 6])); setRev2(s => new Set([...s, 0])); });
@@ -118,11 +152,12 @@ function HelpAnim3() {
     t(3000, () => { setTiles(s => ({ ...s, E: 'done' })); setRev1(s => new Set([...s, 1])); setRev2(s => new Set([...s, 3])); });
     t(4600, () => setCycle(c => c + 1));
     return () => ts.forEach(clearTimeout);
-  }, [cycle]);
+  }, [cycle, active]);
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
       <div style={{ display: 'flex', gap: 8 }}>
-        {['B', 'R', 'E'].map(ch => <MiniTile key={ch} ch={ch} state={tiles[ch]} />)}
+        {TILES.map(ch => <MiniTile key={ch} ch={ch} state={tiles[ch]} />)}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <MiniPhrase phrase={DP1} getState={i => rev1.has(i) ? 'revealed' : 'slot'} />
@@ -132,25 +167,24 @@ function HelpAnim3() {
   );
 }
 
-function HelpAnim4() {
-  // Post-reveal state: after B, R, E picked
+function HelpAnim4({ active }) {
   const REV1 = new Set([1, 5, 6, 9, 10]);
   const REV2 = new Set([0, 1, 3, 4, 7, 9, 10]);
   const [t1, setT1] = useState({});
   const [t2, setT2] = useState({});
   const [win, setWin] = useState(false);
   const [cycle, setCycle] = useState(0);
+
   useEffect(() => {
+    if (!active) return;
     setT1({}); setT2({}); setWin(false);
     const ts = []; const t = (ms, fn) => ts.push(setTimeout(fn, ms));
-    // Type KEVIN BACON hidden: K(0) V(2) I(3) N(4) A(7) C(8)
     t(300,  () => setT1(s => ({ ...s, 0: 'K' })));
     t(500,  () => setT1(s => ({ ...s, 2: 'V' })));
     t(700,  () => setT1(s => ({ ...s, 3: 'I' })));
     t(900,  () => setT1(s => ({ ...s, 4: 'N' })));
     t(1100, () => setT1(s => ({ ...s, 7: 'A' })));
     t(1300, () => setT1(s => ({ ...s, 8: 'C' })));
-    // Type BRIE LARSON hidden: I(2) L(5) A(6) S(8)
     t(1600, () => setT2(s => ({ ...s, 2: 'I' })));
     t(1800, () => setT2(s => ({ ...s, 5: 'L' })));
     t(2000, () => setT2(s => ({ ...s, 6: 'A' })));
@@ -158,9 +192,10 @@ function HelpAnim4() {
     t(2600, () => setWin(true));
     t(4200, () => setCycle(c => c + 1));
     return () => ts.forEach(clearTimeout);
-  }, [cycle]);
-  const g1 = i => (win || REV1.has(i)) ? 'revealed' : t1[i] ? 'plain' : 'hidden';
-  const g2 = i => (win || REV2.has(i)) ? 'revealed' : t2[i] ? 'plain' : 'hidden';
+  }, [cycle, active]);
+
+  const g1 = i => (win || REV1.has(i)) ? 'revealed' : t1[i] ? 'plain' : 'slot';
+  const g2 = i => (win || REV2.has(i)) ? 'revealed' : t2[i] ? 'plain' : 'slot';
   const ck = { fontFamily: "'DM Mono',monospace", fontSize: '0.9rem', fontWeight: 700, color: 'var(--accent)', marginLeft: 8, transition: 'opacity 0.3s' };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
@@ -176,14 +211,14 @@ function HelpAnim4() {
   );
 }
 
-// ─── Help page content ────────────────────────────────────────────────────────
+// ─── Help content ─────────────────────────────────────────────────────────────
 const HELP_TEXT = [
   'Meet the doppels: two phrases of identical length, tied together by a single clue.',
   'In this game, doppels are mostly covered. Letters that sit in the same spot in each phrase will be revealed for you, as will blank spaces.',
   'The rest of the letters in both phrases will be displayed in a pile. Click twice to reveal them wherever they appear. Choose wisely — you only get three.',
   'Correctly guess the doppels to win.',
 ];
-const HELP_ANIMS = [HelpAnim1, HelpAnim2, HelpAnim3, HelpAnim4];
+const HELP_COMPS = [HelpAnim1, HelpAnim2, HelpAnim3, HelpAnim4];
 
 // ─── Game helpers ─────────────────────────────────────────────────────────────
 function getCommon(p1, p2) {
@@ -242,16 +277,22 @@ export default function App() {
   const [ghostPos,  setGhostPos]  = useState(null);
   const [ghostChar, setGhostChar] = useState(null);
 
-  // Help state
+  // Help
   const [showHelp, setShowHelp] = useState(() => !localStorage.getItem(HELP_KEY));
   const [helpPage, setHelpPage] = useState(0);
   const [dontShow, setDontShow] = useState(false);
+  // Carousel drag
+  const [dragDelta, setDragDelta] = useState(0);
+  const [swiping,   setSwiping]   = useState(false);
+  const [cardWidth, setCardWidth]  = useState(340);
+  const cardRef    = useRef(null);
+  const helpDragX  = useRef(null);
+  const helpDragDX = useRef(0);
 
   const dragSrc     = useRef(null);
   const poolDragIdx = useRef(null);
   const slotRefs    = useRef({});
   const touchStateRef = useRef({ startPos: null, isDragging: false, source: null });
-  const swipeStart  = useRef(null);
 
   const LINES1 = wrapPhrase(p1);
   const LINES2 = wrapPhrase(p2);
@@ -262,12 +303,43 @@ export default function App() {
     return () => document.removeEventListener('touchmove', prevent);
   }, []);
 
+  // Measure card width whenever help opens
+  useEffect(() => {
+    if (showHelp && cardRef.current) setCardWidth(cardRef.current.offsetWidth);
+  }, [showHelp]);
+
   function closeHelp() {
     if (dontShow) localStorage.setItem(HELP_KEY, '1');
     setShowHelp(false);
+    setHelpPage(0);
   }
+  function openHelp() { setHelpPage(0); setDragDelta(0); setSwiping(false); setShowHelp(true); }
 
-  function openHelp() { setHelpPage(0); setShowHelp(true); }
+  // ── Help carousel touch ──────────────────────────────────────────────────
+  function onHelpTouchStart(e) {
+    helpDragX.current = e.touches[0].clientX;
+    helpDragDX.current = 0;
+    setSwiping(false);
+    setDragDelta(0);
+  }
+  function onHelpTouchMove(e) {
+    if (helpDragX.current === null) return;
+    const dx = e.touches[0].clientX - helpDragX.current;
+    helpDragDX.current = dx;
+    setSwiping(true);
+    let d = dx;
+    if (helpPage === 0 && dx > 0) d = dx * 0.25;
+    if (helpPage === 3 && dx < 0) d = dx * 0.25;
+    setDragDelta(d);
+  }
+  function onHelpTouchEnd() {
+    const dx = helpDragDX.current;
+    helpDragX.current = null;
+    setSwiping(false);
+    setDragDelta(0);
+    if (dx < -60 && helpPage < 3) setHelpPage(p => p + 1);
+    else if (dx > 60 && helpPage > 0) setHelpPage(p => p - 1);
+  }
 
   // ── Drag handlers ────────────────────────────────────────────────────────
   function startDragFromPool(ch, idx) { poolDragIdx.current = idx; dragSrc.current = null; setDrag(ch); }
@@ -431,9 +503,9 @@ export default function App() {
     <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--accent)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 700, flexShrink: 0, fontFamily: "'DM Mono',monospace", marginRight: 6, alignSelf: 'flex-end', marginBottom: 4 }}>{n}</div>
   );
 
-  // ── Help modal styles ────────────────────────────────────────────────────
-  const navBtn = { background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'DM Mono',monospace", fontSize: '1rem', color: 'var(--accent)', padding: '0.25rem 0.5rem' };
-  const HelpAnim = HELP_ANIMS[helpPage];
+  const navBtn = { background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'DM Mono',monospace", fontSize: '1.2rem', color: 'var(--accent)', padding: '0.25rem 0.5rem' };
+  const CW = cardWidth || 340;
+  const PAD = 24; // 1.5rem card padding
 
   return (
     <div style={{ minHeight: '100dvh', background: 'var(--bg)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '2.5rem 1.5rem', gap: '1.8rem' }}>
@@ -555,52 +627,62 @@ export default function App() {
 
       {/* Help modal */}
       {showHelp && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}
+          onClick={closeHelp}
+        >
           <div
-            style={{ background: 'var(--bg)', borderRadius: 10, padding: '1.4rem 1.6rem', maxWidth: 380, width: '100%', display: 'flex', flexDirection: 'column', gap: '1.2rem', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}
-            onTouchStart={e => { swipeStart.current = e.touches[0].clientX; }}
-            onTouchEnd={e => {
-              if (swipeStart.current === null) return;
-              const dx = e.changedTouches[0].clientX - swipeStart.current;
-              swipeStart.current = null;
-              if (Math.abs(dx) < 40) return;
-              if (dx < 0 && helpPage < 3) setHelpPage(p => p + 1);
-              else if (dx > 0 && helpPage > 0) setHelpPage(p => p - 1);
-            }}
+            ref={cardRef}
+            style={{ background: 'var(--bg)', borderRadius: 10, maxWidth: 380, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', overflow: 'hidden' }}
+            onClick={e => e.stopPropagation()}
+            onTouchStart={onHelpTouchStart}
+            onTouchMove={onHelpTouchMove}
+            onTouchEnd={onHelpTouchEnd}
           >
-
-            {/* Top bar — dontShow only on page 0 */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 24 }}>
+            {/* Top bar */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `${PAD}px ${PAD}px ${PAD * 0.6}px`, minHeight: 52 }}>
               {helpPage === 0
-                ? <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                ? <label style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer' }}>
                     <input type="checkbox" checked={dontShow} onChange={e => setDontShow(e.target.checked)} style={{ accentColor: 'var(--accent)', width: 14, height: 14 }} />
                     <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.68rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--dim)' }}>Don't show this again</span>
                   </label>
                 : <div />
               }
-              <button onClick={closeHelp} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--dim)', fontSize: '1.2rem', lineHeight: 1, padding: '0 0 0 8px' }}>×</button>
+              <button onClick={closeHelp} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--dim)', fontSize: '1.2rem', lineHeight: 1, padding: 0, marginLeft: 8 }}>×</button>
             </div>
 
-            {/* Page text */}
-            <p style={{ fontFamily: "'DM Serif Display',serif", fontSize: '1.15rem', color: 'var(--text)', lineHeight: 1.55, margin: 0 }}>
-              {HELP_TEXT[helpPage]}
-            </p>
-
-            {/* Animation */}
-            <div style={{ display: 'flex', justifyContent: 'center', minHeight: 110, alignItems: 'center' }}>
-              <HelpAnim key={helpPage} />
+            {/* Slides viewport */}
+            <div style={{ overflow: 'hidden' }}>
+              <div style={{
+                display: 'flex',
+                width: `${4 * CW}px`,
+                transform: `translateX(${-helpPage * CW + dragDelta}px)`,
+                transition: swiping ? 'none' : 'transform 0.32s cubic-bezier(0.25,0.46,0.45,0.94)',
+                willChange: 'transform',
+              }}>
+                {HELP_COMPS.map((Comp, p) => (
+                  <div key={p} style={{ width: CW, flexShrink: 0, padding: `0 ${PAD}px`, boxSizing: 'border-box' }}>
+                    <p style={{ fontFamily: "'DM Serif Display',serif", fontSize: '1.15rem', color: 'var(--text)', lineHeight: 1.55, margin: `0 0 ${PAD}px` }}>
+                      {HELP_TEXT[p]}
+                    </p>
+                    <div style={{ display: 'flex', justifyContent: 'center', minHeight: 118, alignItems: 'center' }}>
+                      <Comp active={helpPage === p} />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Navigation */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <button onClick={() => setHelpPage(p => p - 1)} disabled={helpPage === 0} style={{ ...navBtn, fontSize: '1.2rem', opacity: helpPage === 0 ? 0.25 : 1 }}>←</button>
-              <div style={{ display: 'flex', gap: 7 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `${PAD * 0.8}px ${PAD}px ${PAD}px` }}>
+              <button onClick={() => setHelpPage(p => p - 1)} disabled={helpPage === 0} style={{ ...navBtn, opacity: helpPage === 0 ? 0.25 : 1 }}>←</button>
+              <div style={{ display: 'flex', gap: 8 }}>
                 {[0, 1, 2, 3].map(i => (
                   <div key={i} onClick={() => setHelpPage(i)} style={{ width: 8, height: 8, borderRadius: '50%', background: i === helpPage ? 'var(--accent)' : 'var(--border-dim)', cursor: 'pointer', transition: 'background 0.2s' }} />
                 ))}
               </div>
               {helpPage < 3
-                ? <button onClick={() => setHelpPage(p => p + 1)} style={{ ...navBtn, fontSize: '1.2rem' }}>→</button>
+                ? <button onClick={() => setHelpPage(p => p + 1)} style={navBtn}>→</button>
                 : <button onClick={closeHelp} style={{ background: 'var(--accent)', border: 'none', color: '#fff', fontFamily: "'DM Mono',monospace", fontSize: '0.68rem', letterSpacing: '0.16em', textTransform: 'uppercase', padding: '0.55rem 1rem', borderRadius: 3, cursor: 'pointer', fontWeight: 500 }}>Play</button>
               }
             </div>
