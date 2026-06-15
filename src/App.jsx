@@ -255,8 +255,7 @@ export default function App() {
     for (let i = 0; i < p2.length; i++) if (p2[i] === ch) nr2.add(i);
     setRev1(nr1); setRev2(nr2);
     const t = new Map(tentative);
-    for (let i = 0; i < p1.length; i++) if (p1[i] === ch) t.delete(`0-${i}`);
-    for (let i = 0; i < p2.length; i++) if (p2[i] === ch) t.delete(`1-${i}`);
+    for (const [key, val] of tentative) if (val === ch) t.delete(key);
     setTent(t);
     setTyped1(td => { const n = { ...td }; for (let i = 0; i < p1.length; i++) if (p1[i] === ch) delete n[i]; return n; });
     setTyped2(td => { const n = { ...td }; for (let i = 0; i < p2.length; i++) if (p2[i] === ch) delete n[i]; return n; });
