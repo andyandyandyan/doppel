@@ -516,15 +516,29 @@ export default function App() {
                             )}
                             {!revealed && !tentChar && (
                               <>
-                                {typed[i] && (
+                                {typed[i] ? (
                                   <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', fontWeight: 500, color: 'var(--text)', userSelect: 'none', pointerEvents: 'none' }}>
                                     {typed[i]}
                                   </span>
-                                )}
+                                ) : isFocused ? (
+                                  <span className="slot-cursor" style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.9rem', fontWeight: 300, color: 'var(--accent)', userSelect: 'none', pointerEvents: 'none', lineHeight: 1 }}>|</span>
+                                ) : null}
                                 <input
                                   ref={el => { slotRefs.current[`${pi}-${i}`] = el; }}
-                                  readOnly value=""
+                                  type="text"
+                                  autoComplete="off" autoCorrect="off"
+                                  autoCapitalize="characters" spellCheck={false}
                                   onKeyDown={e => handleSlotKeyDown(pi, i, e)}
+                                  onChange={e => {
+                                    const val = e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
+                                    e.target.value = '';
+                                    if (!val) return;
+                                    const ch = val.slice(-1);
+                                    if (pi === 0) setTyped1(t => ({ ...t, [i]: ch }));
+                                    else setTyped2(t => ({ ...t, [i]: ch }));
+                                    const next = getNextTypeable(pi, i);
+                                    if (next !== null) focusSlot(pi, next);
+                                  }}
                                   onFocus={() => { if (pi === 0) setFocus1(i); else setFocus2(i); }}
                                   onBlur={() => { if (pi === 0) setFocus1(null); else setFocus2(null); }}
                                   style={{
