@@ -4,7 +4,7 @@ const PUZZLE = {
   p1: 'MULHOLLAND DRIVE',
   p2: 'SUNSET BOULEVARD',
 };
-const MAX_PICKS = 5;
+const MAX_PICKS = 3;
 
 function getCommon(p1, p2) {
   const s = new Set();
@@ -75,8 +75,8 @@ export default function App() {
   const dragSrc = useRef(null);
   const poolDragIdx = useRef(null);
   const slotRefs = useRef({});
+  const [pendingTile, setPendingTile] = useState(null);
   const touchStateRef = useRef({ startPos: null, isDragging: false, source: null });
-  const lastTapRef = useRef(null);
   const [ghostPos, setGhostPos] = useState(null);
   const [ghostChar, setGhostChar] = useState(null);
 
@@ -193,14 +193,7 @@ export default function App() {
         if (isDragging) {
           handleTouchDrop(t.clientX, t.clientY);
         } else {
-          const now = Date.now();
-          const last = lastTapRef.current;
-          if (last && last.ch === ch && now - last.time < 350) {
-            handleReveal(ch);
-            lastTapRef.current = null;
-          } else {
-            lastTapRef.current = { ch, time: now };
-          }
+          // onClick will fire after touchEnd and call handleTileClick
           touchStateRef.current = { startPos: null, isDragging: false, source: null };
         }
       },
@@ -243,6 +236,16 @@ export default function App() {
     setTent(m => new Map(m).set(`${pi}-${idx}`, dragging));
     dragSrc.current = null;
     setDrag(null);
+  }
+
+  function handleTileClick(ch) {
+    if (allInstancesRevealed(ch, p1, p2, rev1, rev2)) return;
+    if (pendingTile === ch) {
+      handleReveal(ch);
+      setPendingTile(null);
+    } else {
+      setPendingTile(ch);
+    }
   }
 
   function handleReveal(ch) {
@@ -377,7 +380,7 @@ export default function App() {
 
       {/* Tile pool */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-        <div style={dimLabel}>double-click to reveal · drag to place</div>
+        <div style={dimLabel}>click twice to reveal · drag to place</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', maxWidth: 520 }}>
           {pool.map((ch, i) => {
             const done = allInstancesRevealed(ch, p1, p2, rev1, rev2);
@@ -404,20 +407,20 @@ export default function App() {
                   poolDragIdx.current = null;
                   setDrag(null);
                 }}
-                onDoubleClick={() => handleReveal(ch)}
+                onClick={() => handleTileClick(ch)}
                 style={{
                   width: 36, height: 42,
                   border: `1.5px solid ${done ? 'var(--border-dim)' : 'var(--border)'}`,
                   borderRadius: 4,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontFamily: "'DM Mono',monospace", fontSize: '0.9rem', fontWeight: 500,
-                  background: done ? 'transparent' : 'var(--tile-bg)',
-                  color: done ? 'var(--border-dim)' : 'var(--text)',
-                  cursor: done ? 'default' : 'grab',
+                  background: done ? 'transparent' : pendingTile === ch ? 'var(--border-dim)' : 'var(--tile-bg)',
+                  color: done ? 'var(--border-dim)' : pendingTile === ch ? 'var(--dim)' : 'var(--text)',
+                  cursor: done ? 'default' : 'pointer',
                   userSelect: 'none',
                   opacity: done ? 0.35 : 1,
-                  transition: 'opacity 0.3s',
-                  boxShadow: !done ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  transition: 'background 0.15s, color 0.15s, opacity 0.3s',
+                  boxShadow: !done && pendingTile !== ch ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
                   touchAction: 'none',
                 }}>
                 {ch}
