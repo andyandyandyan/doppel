@@ -503,16 +503,19 @@ export default function App() {
                                 {...slotTileTouch(pi, i, tentChar)}
                                 onDragStart={e => { e.stopPropagation(); startDragFromSlot(pi, i, tentChar); }}
                                 onDragEnd={handleDragEnd}
+                                onClick={e => { e.stopPropagation(); handleTileClick(tentChar); }}
                                 style={{
                                   position: 'absolute', inset: '0 0 2px 0',
                                   border: '1.5px solid var(--border)', borderRadius: 3,
-                                  background: 'var(--tile-bg)',
+                                  background: pendingTile === tentChar ? 'var(--border-dim)' : 'var(--tile-bg)',
                                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                                   fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', fontWeight: 500,
-                                  color: 'var(--text)', cursor: 'grab', userSelect: 'none',
-                                  boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+                                  color: pendingTile === tentChar ? 'var(--dim)' : 'var(--text)',
+                                  cursor: 'pointer', userSelect: 'none',
+                                  boxShadow: pendingTile === tentChar ? 'none' : '0 1px 3px rgba(0,0,0,0.12)',
                                   touchAction: 'none',
                                   opacity: touchDragSlot?.pi === pi && touchDragSlot?.idx === i ? 0 : 1,
+                                  transition: 'background 0.15s, color 0.15s',
                                 }}>
                                 {tentChar}
                               </div>
