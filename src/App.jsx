@@ -107,6 +107,8 @@ export default function App() {
     setDrag(null);
   }
 
+  const [touchDragSlot, setTouchDragSlot] = useState(null); // { pi, idx } — slot tile hidden during touch drag
+
   function startTouchDrag(source, ch, x, y) {
     touchStateRef.current.isDragging = true;
     touchStateRef.current.source = source;
@@ -116,7 +118,8 @@ export default function App() {
     if (source.type === 'pool') {
       poolDragIdx.current = source.poolIdx;
     } else {
-      setTent(m => { const n = new Map(m); n.delete(`${source.pi}-${source.idx}`); return n; });
+      // Hide the tile visually but keep it in the DOM so touch events keep firing
+      setTouchDragSlot({ pi: source.pi, idx: source.idx });
     }
   }
 
@@ -130,8 +133,18 @@ export default function App() {
       const idx = parseInt(slotEl.dataset.idx);
       const rev = pi === 0 ? rev1 : rev2;
       if (!rev.has(idx)) {
-        setTent(m => new Map(m).set(`${pi}-${idx}`, source.ch));
+        setTent(m => {
+          const n = new Map(m);
+          if (source.type === 'slot') n.delete(`${source.pi}-${source.idx}`);
+          n.set(`${pi}-${idx}`, source.ch);
+          return n;
+        });
+      } else if (source.type === 'slot') {
+        setTent(m => { const n = new Map(m); n.delete(`${source.pi}-${source.idx}`); return n; });
       }
+    } else if (source.type === 'slot') {
+      // Dropped nowhere — remove tentative (returns to pool)
+      setTent(m => { const n = new Map(m); n.delete(`${source.pi}-${source.idx}`); return n; });
     } else if (source.type === 'pool') {
       const poolEl = el?.closest('[data-pool-tile]');
       if (poolEl) {
@@ -148,6 +161,7 @@ export default function App() {
       }
     }
     touchStateRef.current = { startPos: null, isDragging: false, source: null };
+    setTouchDragSlot(null);
     setGhostPos(null);
     setGhostChar(null);
     setDrag(null);
@@ -495,6 +509,7 @@ export default function App() {
                                   color: 'var(--text)', cursor: 'grab', userSelect: 'none',
                                   boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
                                   touchAction: 'none',
+                                  opacity: touchDragSlot?.pi === pi && touchDragSlot?.idx === i ? 0 : 1,
                                 }}>
                                 {tentChar}
                               </div>
