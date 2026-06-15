@@ -15,29 +15,30 @@ const DR1 = new Set([5, 9, 10]);
 const DR2 = new Set([4, 9, 10]);
 
 // ─── Mini display components ──────────────────────────────────────────────────
-function MiniSlot({ ch, state }) {
+function MiniSlot({ ch, state, fadeDuration = '0.3s' }) {
   const rev = state === 'revealed';
+  const slot = state === 'slot';
   return (
     <div style={{
-      width: 17, height: 24, flexShrink: 0,
+      width: 22, height: 30, flexShrink: 0,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      borderBottom: `1.5px solid ${rev ? 'var(--accent)' : 'var(--border)'}`,
-      fontFamily: "'DM Mono',monospace", fontSize: '0.58rem', fontWeight: 500,
+      borderBottom: `2px solid ${rev ? 'var(--accent)' : 'var(--border)'}`,
+      fontFamily: "'DM Mono',monospace", fontSize: '0.72rem', fontWeight: 500,
       color: rev ? 'var(--accent)' : 'var(--text)',
       opacity: state === 'hidden' ? 0 : 1,
-      transition: 'opacity 0.4s, color 0.4s, border-color 0.4s',
+      transition: `opacity ${fadeDuration}, color 0.3s, border-color 0.3s`,
       userSelect: 'none',
-    }}>{ch}</div>
+    }}>{slot ? '' : ch}</div>
   );
 }
 
-function MiniPhrase({ phrase, getState }) {
+function MiniPhrase({ phrase, getState, fadeDuration }) {
   return (
-    <div style={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
+    <div style={{ display: 'flex', gap: 2, alignItems: 'flex-end' }}>
       {phrase.split('').map((ch, i) =>
         ch === ' '
-          ? <div key={i} style={{ width: 17, flexShrink: 0 }} />
-          : <MiniSlot key={i} ch={ch} state={getState(i)} />
+          ? <div key={i} style={{ width: 22, flexShrink: 0 }} />
+          : <MiniSlot key={i} ch={ch} state={getState(i)} fadeDuration={fadeDuration} />
       )}
     </div>
   );
@@ -46,10 +47,10 @@ function MiniPhrase({ phrase, getState }) {
 function MiniTile({ ch, state }) {
   return (
     <div style={{
-      width: 28, height: 34, borderRadius: 3,
+      width: 36, height: 42, borderRadius: 4,
       border: `1.5px solid ${state === 'done' ? 'var(--border-dim)' : 'var(--border)'}`,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', fontWeight: 500,
+      fontFamily: "'DM Mono',monospace", fontSize: '0.9rem', fontWeight: 500,
       background: state === 'pending' ? 'var(--border-dim)' : state === 'done' ? 'transparent' : 'var(--tile-bg)',
       color: state === 'pending' || state === 'done' ? 'var(--dim)' : 'var(--text)',
       opacity: state === 'done' ? 0.4 : 1,
@@ -61,7 +62,7 @@ function MiniTile({ ch, state }) {
 }
 
 const DemoTitle = () => (
-  <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '0.82rem', color: 'var(--dim)', marginBottom: 6 }}>
+  <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '1rem', color: 'var(--dim)', marginBottom: 8 }}>
     "they are what we eat"
   </div>
 );
@@ -84,18 +85,17 @@ function HelpAnim2() {
   const [cycle, setCycle] = useState(0);
   useEffect(() => {
     setFaded(false);
-    const t1 = setTimeout(() => setFaded(true), 700);
-    const t2 = setTimeout(() => setCycle(c => c + 1), 3200);
+    const t1 = setTimeout(() => setFaded(true), 800);
+    const t2 = setTimeout(() => setCycle(c => c + 1), 4000);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [cycle]);
-  const s1 = i => !faded ? 'plain' : (i === 9 || i === 10) ? 'revealed' : 'hidden';
-  const s2 = i => !faded ? 'plain' : (i === 9 || i === 10) ? 'revealed' : 'hidden';
+  const s1 = i => !faded ? 'plain' : (i === 9 || i === 10) ? 'plain' : 'hidden';
+  const s2 = i => !faded ? 'plain' : (i === 9 || i === 10) ? 'plain' : 'hidden';
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      <DemoTitle />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <MiniPhrase phrase={DP1} getState={s1} />
-        <MiniPhrase phrase={DP2} getState={s2} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <MiniPhrase phrase={DP1} getState={s1} fadeDuration="1.1s" />
+        <MiniPhrase phrase={DP2} getState={s2} fadeDuration="1.1s" />
       </div>
     </div>
   );
@@ -124,9 +124,9 @@ function HelpAnim3() {
       <div style={{ display: 'flex', gap: 8 }}>
         {['B', 'R', 'E'].map(ch => <MiniTile key={ch} ch={ch} state={tiles[ch]} />)}
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <MiniPhrase phrase={DP1} getState={i => rev1.has(i) ? 'revealed' : 'hidden'} />
-        <MiniPhrase phrase={DP2} getState={i => rev2.has(i) ? 'revealed' : 'hidden'} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <MiniPhrase phrase={DP1} getState={i => rev1.has(i) ? 'revealed' : 'slot'} />
+        <MiniPhrase phrase={DP2} getState={i => rev2.has(i) ? 'revealed' : 'slot'} />
       </div>
     </div>
   );
@@ -161,7 +161,7 @@ function HelpAnim4() {
   }, [cycle]);
   const g1 = i => (win || REV1.has(i)) ? 'revealed' : t1[i] ? 'plain' : 'hidden';
   const g2 = i => (win || REV2.has(i)) ? 'revealed' : t2[i] ? 'plain' : 'hidden';
-  const ck = { fontFamily: "'DM Mono',monospace", fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent)', marginLeft: 6, transition: 'opacity 0.3s' };
+  const ck = { fontFamily: "'DM Mono',monospace", fontSize: '0.9rem', fontWeight: 700, color: 'var(--accent)', marginLeft: 8, transition: 'opacity 0.3s' };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
       <div style={{ display: 'flex', alignItems: 'flex-end' }}>
@@ -251,6 +251,7 @@ export default function App() {
   const poolDragIdx = useRef(null);
   const slotRefs    = useRef({});
   const touchStateRef = useRef({ startPos: null, isDragging: false, source: null });
+  const swipeStart  = useRef(null);
 
   const LINES1 = wrapPhrase(p1);
   const LINES2 = wrapPhrase(p2);
@@ -555,38 +556,52 @@ export default function App() {
       {/* Help modal */}
       {showHelp && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
-          <div style={{ background: 'var(--bg)', borderRadius: 10, padding: '1.25rem 1.5rem', maxWidth: 360, width: '100%', display: 'flex', flexDirection: 'column', gap: '1.1rem', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}>
+          <div
+            style={{ background: 'var(--bg)', borderRadius: 10, padding: '1.4rem 1.6rem', maxWidth: 380, width: '100%', display: 'flex', flexDirection: 'column', gap: '1.2rem', boxShadow: '0 8px 40px rgba(0,0,0,0.18)' }}
+            onTouchStart={e => { swipeStart.current = e.touches[0].clientX; }}
+            onTouchEnd={e => {
+              if (swipeStart.current === null) return;
+              const dx = e.changedTouches[0].clientX - swipeStart.current;
+              swipeStart.current = null;
+              if (Math.abs(dx) < 40) return;
+              if (dx < 0 && helpPage < 3) setHelpPage(p => p + 1);
+              else if (dx > 0 && helpPage > 0) setHelpPage(p => p - 1);
+            }}
+          >
 
-            {/* Top bar */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                <input type="checkbox" checked={dontShow} onChange={e => setDontShow(e.target.checked)} style={{ accentColor: 'var(--accent)', width: 13, height: 13 }} />
-                <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--dim)' }}>Don't show this again</span>
-              </label>
-              <button onClick={closeHelp} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--dim)', fontSize: '1rem', lineHeight: 1, padding: '0 0 0 8px' }}>×</button>
+            {/* Top bar — dontShow only on page 0 */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 24 }}>
+              {helpPage === 0
+                ? <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={dontShow} onChange={e => setDontShow(e.target.checked)} style={{ accentColor: 'var(--accent)', width: 14, height: 14 }} />
+                    <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.68rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--dim)' }}>Don't show this again</span>
+                  </label>
+                : <div />
+              }
+              <button onClick={closeHelp} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--dim)', fontSize: '1.2rem', lineHeight: 1, padding: '0 0 0 8px' }}>×</button>
             </div>
 
             {/* Page text */}
-            <p style={{ fontFamily: "'DM Serif Display',serif", fontSize: '1rem', color: 'var(--text)', lineHeight: 1.55, margin: 0 }}>
+            <p style={{ fontFamily: "'DM Serif Display',serif", fontSize: '1.15rem', color: 'var(--text)', lineHeight: 1.55, margin: 0 }}>
               {HELP_TEXT[helpPage]}
             </p>
 
             {/* Animation */}
-            <div style={{ display: 'flex', justifyContent: 'center', minHeight: 100, alignItems: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', minHeight: 110, alignItems: 'center' }}>
               <HelpAnim key={helpPage} />
             </div>
 
             {/* Navigation */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <button onClick={() => setHelpPage(p => p - 1)} disabled={helpPage === 0} style={{ ...navBtn, opacity: helpPage === 0 ? 0.25 : 1 }}>←</button>
-              <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={() => setHelpPage(p => p - 1)} disabled={helpPage === 0} style={{ ...navBtn, fontSize: '1.2rem', opacity: helpPage === 0 ? 0.25 : 1 }}>←</button>
+              <div style={{ display: 'flex', gap: 7 }}>
                 {[0, 1, 2, 3].map(i => (
-                  <div key={i} onClick={() => setHelpPage(i)} style={{ width: 7, height: 7, borderRadius: '50%', background: i === helpPage ? 'var(--accent)' : 'var(--border-dim)', cursor: 'pointer', transition: 'background 0.2s' }} />
+                  <div key={i} onClick={() => setHelpPage(i)} style={{ width: 8, height: 8, borderRadius: '50%', background: i === helpPage ? 'var(--accent)' : 'var(--border-dim)', cursor: 'pointer', transition: 'background 0.2s' }} />
                 ))}
               </div>
               {helpPage < 3
-                ? <button onClick={() => setHelpPage(p => p + 1)} style={navBtn}>→</button>
-                : <button onClick={closeHelp} style={{ background: 'var(--accent)', border: 'none', color: '#fff', fontFamily: "'DM Mono',monospace", fontSize: '0.62rem', letterSpacing: '0.16em', textTransform: 'uppercase', padding: '0.5rem 0.9rem', borderRadius: 3, cursor: 'pointer', fontWeight: 500 }}>Play</button>
+                ? <button onClick={() => setHelpPage(p => p + 1)} style={{ ...navBtn, fontSize: '1.2rem' }}>→</button>
+                : <button onClick={closeHelp} style={{ background: 'var(--accent)', border: 'none', color: '#fff', fontFamily: "'DM Mono',monospace", fontSize: '0.68rem', letterSpacing: '0.16em', textTransform: 'uppercase', padding: '0.55rem 1rem', borderRadius: 3, cursor: 'pointer', fontWeight: 500 }}>Play</button>
               }
             </div>
 
