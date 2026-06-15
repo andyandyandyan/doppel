@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 const PUZZLE = {
   p1: 'MULHOLLAND DRIVE',
@@ -75,6 +75,16 @@ export default function App() {
   const dragSrc = useRef(null);
   const poolDragIdx = useRef(null);
   const slotRefs = useRef({});
+  const touchStateRef = useRef({ startPos: null, isDragging: false, source: null });
+  const lastTapRef = useRef(null);
+  const [ghostPos, setGhostPos] = useState(null);
+  const [ghostChar, setGhostChar] = useState(null);
+
+  useEffect(() => {
+    const prevent = e => { if (touchStateRef.current.isDragging) e.preventDefault(); };
+    document.addEventListener('touchmove', prevent, { passive: false });
+    return () => document.removeEventListener('touchmove', prevent);
+  }, []);
 
   const LINES1 = wrapPhrase(p1);
   const LINES2 = wrapPhrase(p2);
@@ -95,6 +105,121 @@ export default function App() {
     poolDragIdx.current = null;
     dragSrc.current = null;
     setDrag(null);
+  }
+
+  function startTouchDrag(source, ch, x, y) {
+    touchStateRef.current.isDragging = true;
+    touchStateRef.current.source = source;
+    setGhostPos({ x, y });
+    setGhostChar(ch);
+    setDrag(ch);
+    if (source.type === 'pool') {
+      poolDragIdx.current = source.poolIdx;
+    } else {
+      setTent(m => { const n = new Map(m); n.delete(`${source.pi}-${source.idx}`); return n; });
+    }
+  }
+
+  function handleTouchDrop(x, y) {
+    const { source } = touchStateRef.current;
+    if (!source) return;
+    const el = document.elementFromPoint(x, y);
+    const slotEl = el?.closest('[data-slot]');
+    if (slotEl) {
+      const pi = parseInt(slotEl.dataset.pi);
+      const idx = parseInt(slotEl.dataset.idx);
+      const rev = pi === 0 ? rev1 : rev2;
+      if (!rev.has(idx)) {
+        setTent(m => new Map(m).set(`${pi}-${idx}`, source.ch));
+      }
+    } else if (source.type === 'pool') {
+      const poolEl = el?.closest('[data-pool-tile]');
+      if (poolEl) {
+        const targetIdx = parseInt(poolEl.dataset.poolTile);
+        if (targetIdx !== source.poolIdx) {
+          const src = source.poolIdx;
+          setPool(prev => {
+            const next = [...prev];
+            const [moved] = next.splice(src, 1);
+            next.splice(targetIdx, 0, moved);
+            return next;
+          });
+        }
+      }
+    }
+    touchStateRef.current = { startPos: null, isDragging: false, source: null };
+    setGhostPos(null);
+    setGhostChar(null);
+    setDrag(null);
+    poolDragIdx.current = null;
+    dragSrc.current = null;
+  }
+
+  function poolTileTouch(ch, i) {
+    const THRESHOLD = 8;
+    return {
+      onTouchStart: e => {
+        const t = e.touches[0];
+        touchStateRef.current = { startPos: { x: t.clientX, y: t.clientY }, isDragging: false, source: { type: 'pool', ch, poolIdx: i } };
+      },
+      onTouchMove: e => {
+        const { startPos, isDragging } = touchStateRef.current;
+        if (!startPos) return;
+        const t = e.touches[0];
+        if (!isDragging && Math.hypot(t.clientX - startPos.x, t.clientY - startPos.y) > THRESHOLD) {
+          if (allInstancesRevealed(ch, p1, p2, rev1, rev2)) return;
+          startTouchDrag({ type: 'pool', ch, poolIdx: i }, ch, t.clientX, t.clientY);
+        } else if (isDragging) {
+          setGhostPos({ x: t.clientX, y: t.clientY });
+        }
+      },
+      onTouchEnd: e => {
+        const { isDragging } = touchStateRef.current;
+        const t = e.changedTouches[0];
+        if (isDragging) {
+          handleTouchDrop(t.clientX, t.clientY);
+        } else {
+          const now = Date.now();
+          const last = lastTapRef.current;
+          if (last && last.ch === ch && now - last.time < 350) {
+            handleReveal(ch);
+            lastTapRef.current = null;
+          } else {
+            lastTapRef.current = { ch, time: now };
+          }
+          touchStateRef.current = { startPos: null, isDragging: false, source: null };
+        }
+      },
+    };
+  }
+
+  function slotTileTouch(pi, idx, ch) {
+    const THRESHOLD = 8;
+    return {
+      onTouchStart: e => {
+        const t = e.touches[0];
+        touchStateRef.current = { startPos: { x: t.clientX, y: t.clientY }, isDragging: false, source: { type: 'slot', ch, pi, idx } };
+      },
+      onTouchMove: e => {
+        const { startPos, isDragging } = touchStateRef.current;
+        if (!startPos) return;
+        const t = e.touches[0];
+        if (!isDragging && Math.hypot(t.clientX - startPos.x, t.clientY - startPos.y) > THRESHOLD) {
+          startTouchDrag({ type: 'slot', ch, pi, idx }, ch, t.clientX, t.clientY);
+        } else if (isDragging) {
+          setGhostPos({ x: t.clientX, y: t.clientY });
+        }
+      },
+      onTouchEnd: e => {
+        const { isDragging } = touchStateRef.current;
+        if (isDragging) {
+          const t = e.changedTouches[0];
+          handleTouchDrop(t.clientX, t.clientY);
+        } else {
+          touchStateRef.current = { startPos: null, isDragging: false, source: null };
+        }
+      },
+    };
   }
 
   function handleDropOnSlot(pi, idx) {
@@ -244,7 +369,9 @@ export default function App() {
             const done = allInstancesRevealed(ch, p1, p2, rev1, rev2);
             return (
               <div key={ch}
+                data-pool-tile={i}
                 draggable
+                {...poolTileTouch(ch, i)}
                 onDragStart={() => startDragFromPool(ch, i)}
                 onDragEnd={handleDragEnd}
                 onDragOver={e => e.preventDefault()}
@@ -277,6 +404,7 @@ export default function App() {
                   opacity: done ? 0.35 : 1,
                   transition: 'opacity 0.3s',
                   boxShadow: !done ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  touchAction: 'none',
                 }}>
                 {ch}
               </div>
@@ -335,6 +463,7 @@ export default function App() {
 
                         return (
                           <div key={i}
+                            data-slot="true" data-pi={pi} data-idx={i}
                             style={{
                               width: SLOT_W, height: 38, flexShrink: 0, position: 'relative',
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -354,6 +483,7 @@ export default function App() {
                             {!revealed && tentChar && (
                               <div
                                 draggable
+                                {...slotTileTouch(pi, i, tentChar)}
                                 onDragStart={e => { e.stopPropagation(); startDragFromSlot(pi, i, tentChar); }}
                                 onDragEnd={handleDragEnd}
                                 style={{
@@ -364,6 +494,7 @@ export default function App() {
                                   fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', fontWeight: 500,
                                   color: 'var(--text)', cursor: 'grab', userSelect: 'none',
                                   boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+                                  touchAction: 'none',
                                 }}>
                                 {tentChar}
                               </div>
@@ -419,6 +550,19 @@ export default function App() {
       {won1 && won2 && (
         <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '1.5rem', color: 'var(--accent)', textAlign: 'center' }}>
           Nailed it
+        </div>
+      )}
+
+      {ghostPos && ghostChar && (
+        <div style={{
+          position: 'fixed', left: ghostPos.x - 18, top: ghostPos.y - 21,
+          width: 36, height: 42, border: '1.5px solid var(--border)', borderRadius: 4,
+          background: 'var(--tile-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontFamily: "'DM Mono',monospace", fontSize: '0.9rem', fontWeight: 500, color: 'var(--text)',
+          pointerEvents: 'none', zIndex: 9999, boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+          opacity: 0.9, userSelect: 'none',
+        }}>
+          {ghostChar}
         </div>
       )}
 
