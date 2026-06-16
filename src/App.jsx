@@ -1,15 +1,38 @@
 import { useState, useRef, useEffect } from 'react';
-import puzzleData from '../puzzle.json';
+import puzzleSchedule from '../puzzle.json';
 
-const PUZZLE = {
-  p1: puzzleData.phrase1.trim().toUpperCase(),
-  p2: puzzleData.phrase2.trim().toUpperCase(),
-};
-const PUZZLE_DATE = puzzleData.date;
-const PUZZLE_CLUE = puzzleData.title;
+// ─── Puzzle schedule ────────────────────────────────────────────────────────
+// puzzle.json is a list of { date: "YYYY-MM-DD", title, phrase1, phrase2 },
+// sorted or not — whichever entry has the latest date that is today or
+// earlier (in the visitor's local time) is the one that plays. Add as many
+// future entries as you like; nothing else needs to change day to day.
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function parseLocalDate(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+function formatDisplayDate(iso) {
+  return parseLocalDate(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+}
+
+const SCHEDULE_EMPTY = !Array.isArray(puzzleSchedule) || puzzleSchedule.length === 0;
 // A doppel's whole premise is that both phrases are the same length — catch a
-// puzzle.json typo here instead of shipping a broken board.
-const PUZZLE_LENGTH_MISMATCH = PUZZLE.p1.length !== PUZZLE.p2.length;
+// puzzle.json typo here (for any scheduled date) instead of shipping a broken board.
+const BAD_ENTRIES = SCHEDULE_EMPTY ? [] : puzzleSchedule.filter(e => e.phrase1.trim().length !== e.phrase2.trim().length);
+const PUZZLE_ERROR = SCHEDULE_EMPTY || BAD_ENTRIES.length > 0;
+
+let PUZZLE = { p1: '', p2: '' }, PUZZLE_DATE = '', PUZZLE_CLUE = '';
+if (!PUZZLE_ERROR) {
+  const sorted = [...puzzleSchedule].sort((a, b) => a.date.localeCompare(b.date));
+  const today = todayISO();
+  const selected = sorted.filter(e => e.date <= today).pop() || sorted[0];
+  PUZZLE = { p1: selected.phrase1.trim().toUpperCase(), p2: selected.phrase2.trim().toUpperCase() };
+  PUZZLE_DATE = formatDisplayDate(selected.date);
+  PUZZLE_CLUE = selected.title;
+}
 const MAX_PICKS = 3;
 const HELP_KEY = 'doppel-help-seen';
 const GHOST_LIFT = 56; // lift the dragged tile above a finger on touch devices
@@ -690,14 +713,15 @@ export default function App() {
   const CW = cardWidth || 340;
   const PAD = 24; // 1.5rem card padding
 
-  if (PUZZLE_LENGTH_MISMATCH) {
+  if (PUZZLE_ERROR) {
     return (
       <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', textAlign: 'center' }}>
         <div>
           <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '1.4rem', color: 'var(--error)', marginBottom: '0.8rem' }}>puzzle.json error</div>
           <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.8rem', color: 'var(--text)', lineHeight: 1.6 }}>
-            phrase1 and phrase2 must be the same length.<br />
-            phrase1 is {PUZZLE.p1.length} characters, phrase2 is {PUZZLE.p2.length}.
+            {SCHEDULE_EMPTY
+              ? 'puzzle.json has no puzzles in it.'
+              : <>phrase1 and phrase2 must be the same length.<br />Check: {BAD_ENTRIES.map(e => e.date).join(', ')}</>}
           </div>
         </div>
       </div>

@@ -1,6 +1,14 @@
-{
-  "date": "June 16",
-  "title": "spoils of summer",
-  "phrase1": "FARMERS MARKET TOMATOES",
-  "phrase2": "FRESH SQUEEZED LEMONADE"
-}
+[
+  {
+    "date": "2026-06-15",
+    "title": "hollywood on hollywood",
+    "phrase1": "MULHOLLAND DRIVE",
+    "phrase2": "SUNSET BOULEVARD"
+  },
+  {
+    "date": "2026-06-16",
+    "title": "spoils of summer",
+    "phrase1": "FARMERS MARKET TOMATOES",
+    "phrase2": "FRESH SQUEEZED LEMONADE"
+  }
+]
