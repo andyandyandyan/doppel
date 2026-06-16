@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Serif+Display:ital@0;1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Serif+Display:ital@0;1&family=Caveat:wght@600;700&display=swap');
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -12,6 +12,10 @@
   --tile-bg:    #ffffff;
   --dim:        #8a8680;
   --error:      #b84040;
+  --rack-bg:    #e8ddc3;
+  --rack-border:#c7b896;
+  --pending-bg:   #ffcf56;
+  --pending-text: #7a4a00;
 }
 
 body {
