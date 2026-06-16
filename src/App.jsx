@@ -1,11 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
+import puzzleData from '../puzzle.json';
 
 const PUZZLE = {
-  p1: 'FARMERS MARKET TOMATOES',
-  p2: 'FRESH SQUEEZED LEMONADE',
+  p1: puzzleData.phrase1.trim().toUpperCase(),
+  p2: puzzleData.phrase2.trim().toUpperCase(),
 };
-const PUZZLE_DATE = 'June 16';
-const PUZZLE_CLUE = 'spoils of summer';
+const PUZZLE_DATE = puzzleData.date;
+const PUZZLE_CLUE = puzzleData.title;
+// A doppel's whole premise is that both phrases are the same length — catch a
+// puzzle.json typo here instead of shipping a broken board.
+const PUZZLE_LENGTH_MISMATCH = PUZZLE.p1.length !== PUZZLE.p2.length;
 const MAX_PICKS = 3;
 const HELP_KEY = 'doppel-help-seen';
 const GHOST_LIFT = 56; // lift the dragged tile above a finger on touch devices
@@ -685,6 +689,20 @@ export default function App() {
   const navBtn = { background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'DM Mono',monospace", fontSize: '1.2rem', color: 'var(--accent)', padding: '0.25rem 0.5rem' };
   const CW = cardWidth || 340;
   const PAD = 24; // 1.5rem card padding
+
+  if (PUZZLE_LENGTH_MISMATCH) {
+    return (
+      <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', textAlign: 'center' }}>
+        <div>
+          <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '1.4rem', color: 'var(--error)', marginBottom: '0.8rem' }}>puzzle.json error</div>
+          <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.8rem', color: 'var(--text)', lineHeight: 1.6 }}>
+            phrase1 and phrase2 must be the same length.<br />
+            phrase1 is {PUZZLE.p1.length} characters, phrase2 is {PUZZLE.p2.length}.
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: '100dvh', background: 'var(--bg)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '2.5rem 1.5rem', gap: '1.8rem' }}>
