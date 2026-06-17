@@ -291,11 +291,14 @@ function HelpScreen4({ active }) {
         <MiniPhrase phrase={DP1} getState={i => rev1.has(i) ? 'revealed' : 'slot'} />
         <MiniPhrase phrase={DP2} getState={i => rev2.has(i) ? 'revealed' : 'slot'} />
       </div>
-      <div style={{ position: 'relative', display: 'flex', gap: 8 }}>
-        {TILES.map(ch => <MiniTile key={ch} ch={ch} state={tiles[ch]} />)}
+      {/* Wrapper with explicit height so the below-tile cursor isn't clipped */}
+      <div style={{ position: 'relative', width: TILES.length * 44 - 8, height: 70 }}>
+        <div style={{ display: 'flex', gap: 8, position: 'absolute', top: 0, left: 0 }}>
+          {TILES.map(ch => <MiniTile key={ch} ch={ch} state={tiles[ch]} />)}
+        </div>
         {cursorX !== null && (
           <div style={{
-            position: 'absolute', left: cursorX - 6, top: -22,
+            position: 'absolute', left: cursorX - 6, top: 44,
             transition: 'left 0.28s ease', pointerEvents: 'none', zIndex: 10,
             transform: clicking ? 'scale(0.8)' : 'scale(1)',
           }}>
