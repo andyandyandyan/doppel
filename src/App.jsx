@@ -25,13 +25,18 @@ const BAD_ENTRIES = SCHEDULE_EMPTY ? [] : puzzleSchedule.filter(e => e.phrase1.t
 const PUZZLE_ERROR = SCHEDULE_EMPTY || BAD_ENTRIES.length > 0;
 
 let PUZZLE = { p1: '', p2: '' }, PUZZLE_DATE = '', PUZZLE_CLUE = '';
+let ARCHIVE_ENTRIES = [], IS_ARCHIVE_MODE = false;
 if (!PUZZLE_ERROR) {
   const sorted = [...puzzleSchedule].sort((a, b) => a.date.localeCompare(b.date));
   const today = todayISO();
-  const selected = sorted.filter(e => e.date <= today).pop() || sorted[0];
+  const archiveParam = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('date') : null;
+  const todaySelected = sorted.filter(e => e.date <= today).pop() || sorted[0];
+  const selected = archiveParam ? (sorted.find(e => e.date === archiveParam) || todaySelected) : todaySelected;
+  IS_ARCHIVE_MODE = !!archiveParam && selected.date !== todaySelected.date;
   PUZZLE = { p1: selected.phrase1.trim().toUpperCase(), p2: selected.phrase2.trim().toUpperCase() };
   PUZZLE_DATE = formatDisplayDate(selected.date);
   PUZZLE_CLUE = selected.title;
+  ARCHIVE_ENTRIES = sorted.filter(e => e.date < today).reverse(); // most recent first
 }
 const MAX_PICKS = 3;
 const HELP_KEY = 'doppel-help-seen';
@@ -139,10 +144,10 @@ function HelpScreen2() {
         <path d={`M${SIDE + 34},34 L${SIDE + 25},30 M${SIDE + 34},34 L${SIDE + 30},25`} stroke="var(--accent)" strokeWidth="1.3" fill="none" strokeLinecap="round" />
       </svg>
 
-      {/* common characters, top-right, arrow curving down to the oval */}
+      {/* common letters / same location, top-right, arrow curving down to the oval */}
       <div style={{ position: 'absolute', top: 0, right: 0, textAlign: 'right' }}>
-        <HandLabel style={{ display: 'block' }}>common</HandLabel>
-        <HandLabel style={{ display: 'block' }}>characters</HandLabel>
+        <HandLabel style={{ display: 'block' }}>common letters,</HandLabel>
+        <HandLabel style={{ display: 'block' }}>same location</HandLabel>
       </div>
       <svg width={OUTER_W} height="118" style={{ position: 'absolute', top: 30, left: 0, overflow: 'visible', pointerEvents: 'none' }}>
         <path d={`M${OUTER_W - SIDE + 8},2 C${OUTER_W - SIDE - 14},36 ${ovalCx + 14},66 ${ovalCx},98`} fill="none" stroke="var(--accent)" strokeWidth="1.3" strokeLinecap="round" />
@@ -249,17 +254,32 @@ function HelpScreen4({ active }) {
   const [rev2, setRev2] = useState(new Set(DR2));
   const [tiles, setTiles] = useState({ A: 'normal', B: 'normal', R: 'normal', E: 'normal', L: 'normal' });
   const [cycle, setCycle] = useState(0);
+  const [cursorX, setCursorX] = useState(null);
+  const [clicking, setClicking] = useState(false);
+
+  // Tile centers within the flex row (width 36, gap 8 → step 44)
+  const tileCenter = idx => 18 + idx * 44;
 
   useEffect(() => {
     if (!active) return;
     setRev1(new Set(DR1)); setRev2(new Set(DR2));
     setTiles({ A: 'normal', B: 'normal', R: 'normal', E: 'normal', L: 'normal' });
+    setCursorX(null); setClicking(false);
     const ts = []; const t = (ms, fn) => ts.push(setTimeout(fn, ms));
-    t(500,  () => setTiles(s => ({ ...s, B: 'pending' })));
+    // B (index 1)
+    t(350,  () => setCursorX(tileCenter(1)));
+    t(500,  () => { setClicking(true); setTiles(s => ({ ...s, B: 'pending' })); });
+    t(680,  () => setClicking(false));
     t(1000, () => { setTiles(s => ({ ...s, B: 'done' })); setRev1(s => new Set([...s, 6])); setRev2(s => new Set([...s, 0])); });
-    t(1500, () => setTiles(s => ({ ...s, R: 'pending' })));
+    // R (index 2)
+    t(1350, () => setCursorX(tileCenter(2)));
+    t(1500, () => { setClicking(true); setTiles(s => ({ ...s, R: 'pending' })); });
+    t(1680, () => setClicking(false));
     t(2000, () => { setTiles(s => ({ ...s, R: 'done' })); setRev2(s => new Set([...s, 1, 7])); });
-    t(2500, () => setTiles(s => ({ ...s, E: 'pending' })));
+    // E (index 3)
+    t(2350, () => setCursorX(tileCenter(3)));
+    t(2500, () => { setClicking(true); setTiles(s => ({ ...s, E: 'pending' })); });
+    t(2680, () => setClicking(false));
     t(3000, () => { setTiles(s => ({ ...s, E: 'done' })); setRev1(s => new Set([...s, 1])); setRev2(s => new Set([...s, 3])); });
     t(4600, () => setCycle(c => c + 1));
     return () => ts.forEach(clearTimeout);
@@ -271,8 +291,22 @@ function HelpScreen4({ active }) {
         <MiniPhrase phrase={DP1} getState={i => rev1.has(i) ? 'revealed' : 'slot'} />
         <MiniPhrase phrase={DP2} getState={i => rev2.has(i) ? 'revealed' : 'slot'} />
       </div>
-      <div style={{ display: 'flex', gap: 8 }}>
+      <div style={{ position: 'relative', display: 'flex', gap: 8 }}>
         {TILES.map(ch => <MiniTile key={ch} ch={ch} state={tiles[ch]} />)}
+        {cursorX !== null && (
+          <div style={{
+            position: 'absolute', left: cursorX - 6, top: -22,
+            transition: 'left 0.28s ease', pointerEvents: 'none', zIndex: 10,
+            transform: clicking ? 'scale(0.8)' : 'scale(1)',
+          }}>
+            <svg width="16" height="20" viewBox="0 0 16 20" style={{ transition: 'transform 0.1s', display: 'block' }}>
+              <path d="M2 1 L2 15 L5.5 11.5 L8 18 L10 17 L7.5 10.5 L13 10.5 Z"
+                fill={clicking ? 'var(--accent)' : 'var(--text)'}
+                stroke="white" strokeWidth="1" strokeLinejoin="round"
+                style={{ transition: 'fill 0.12s' }} />
+            </svg>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -324,7 +358,7 @@ function HelpScreen5({ active }) {
 const HELP_TEXT = [
   'This is a doppel.',
   'A doppel is a pair of phrases that have three things in common: character length, at least one letter in the same position, and a theme.',
-  "In this game, only the doppel's key characteristics — its length, common characters in identical spots, and clue — are visible. You must guess the rest.",
+  "In this game, only the doppel's key characteristics — its length, common letters in identical spots, and clue — are visible. You must guess the rest.",
   'To do that, you have access to all the letters that appear in either word. Double click to reveal their places, but choose wisely: you only get three. The fewer you use, the more impressive your achievement.',
   'Correctly guess the doppel to win.',
 ];
@@ -372,8 +406,33 @@ function wrapPhrase(phrase) {
   return lines;
 }
 
+// ─── Archive modal ─────────────────────────────────────────────────────────────
+function ArchiveModal({ onClose }) {
+  const rowStyle = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border-dim)', cursor: 'pointer', textDecoration: 'none', color: 'inherit' };
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }} onClick={onClose}>
+      <div style={{ position: 'relative', background: 'var(--bg)', borderRadius: 10, maxWidth: 340, width: '100%', maxHeight: '80dvh', overflowY: 'auto', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', padding: '1.6rem' }} onClick={e => e.stopPropagation()}>
+        <button onClick={onClose} style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--dim)', fontSize: '1.2rem', lineHeight: 1, padding: 0 }}>×</button>
+        <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '1.3rem', color: 'var(--accent)', marginBottom: '1rem' }}>Past puzzles</div>
+        {ARCHIVE_ENTRIES.length === 0
+          ? <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', color: 'var(--dim)', textAlign: 'center', padding: '1rem 0' }}>No past puzzles yet.</div>
+          : ARCHIVE_ENTRIES.map(e => (
+            <a key={e.date} href={`?date=${e.date}`} style={rowStyle}>
+              <div>
+                <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.62rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--dim)' }}>{formatDisplayDate(e.date)}</div>
+                <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '1rem', color: 'var(--text)', marginTop: 2 }}>"{e.title}"</div>
+              </div>
+              <div style={{ color: 'var(--dim)', fontSize: '0.9rem', flexShrink: 0, marginLeft: 8 }}>›</div>
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  );
+}
+
 // ─── Result modal ──────────────────────────────────────────────────────────────
-function ResultModal({ outcome, reveals, onClose }) {
+function ResultModal({ outcome, reveals, onClose, onArchive }) {
   const [copied, setCopied] = useState(false);
   const win = outcome === 'win';
   const heading = win ? (reveals === 0 ? 'Perfect!' : 'Nice!') : 'Better luck next time!';
@@ -418,7 +477,7 @@ function ResultModal({ outcome, reveals, onClose }) {
 
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={doShare} style={shareBtn}>Share</button>
-          <button onClick={copyToClipboard} style={ghostBtn}>{copied ? 'Copied' : 'Copy'}</button>
+          <button onClick={onArchive} style={ghostBtn}>Archive</button>
         </div>
       </div>
     </div>
@@ -452,6 +511,7 @@ export default function App() {
   const [giveUpRev1, setGiveUpRev1] = useState(new Set());
   const [giveUpRev2, setGiveUpRev2] = useState(new Set());
   const [showResult, setShowResult] = useState(false);
+  const [showArchive, setShowArchive] = useState(false);
 
   // Help
   const [showHelp, setShowHelp] = useState(() => !localStorage.getItem(HELP_KEY));
@@ -739,6 +799,12 @@ export default function App() {
         <button onClick={openHelp} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '50%', width: 18, height: 18, cursor: 'pointer', fontSize: '0.55rem', color: 'var(--dim)', fontFamily: "'DM Mono',monospace", display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0, marginTop: 6 }}>?</button>
       </div>
 
+      {IS_ARCHIVE_MODE && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <a href="/" style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--dim)', textDecoration: 'underline', cursor: 'pointer' }}>← Today's puzzle</a>
+        </div>
+      )}
+
       <div style={{ textAlign: 'center', lineHeight: 1.3 }}>
         <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.65rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--dim)' }}>{PUZZLE_DATE}</div>
         <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '1.1rem', color: 'var(--text)', marginTop: '0.2rem' }}>"{PUZZLE_CLUE}"</div>
@@ -814,6 +880,16 @@ export default function App() {
         <button onClick={handleGiveUp} style={{ background: 'none', border: 'none', color: 'var(--dim)', fontFamily: "'DM Mono',monospace", fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase', textDecoration: 'underline', cursor: 'pointer', padding: '0.2rem 0.4rem' }}>I give up</button>
       )}
 
+      {/* Tiles-left indicator, floated above the rack */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={dimLabel}>tiles left</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {Array.from({ length: MAX_PICKS }).map((_, i) => (
+            <div key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: i < picksLeft ? 'var(--accent)' : 'var(--border-dim)', transition: 'background 0.3s' }} />
+          ))}
+        </div>
+      </div>
+
       {/* Tile rack */}
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.6rem',
@@ -821,14 +897,6 @@ export default function App() {
         borderRadius: 14, padding: '0.9rem 1.4rem 1.1rem',
         boxShadow: 'inset 0 2px 3px rgba(0,0,0,0.08), inset 0 -1px 0 rgba(255,255,255,0.3), 0 1px 2px rgba(0,0,0,0.05)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={dimLabel}>tiles left</div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {Array.from({ length: MAX_PICKS }).map((_, i) => (
-              <div key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: i < picksLeft ? 'var(--accent)' : 'var(--border-dim)', transition: 'background 0.3s' }} />
-            ))}
-          </div>
-        </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', maxWidth: 520 }}>
           {pool.map((ch, i) => {
             const done = gaveUp || allInstancesRevealed(ch, p1, p2, rev1, rev2);
@@ -844,7 +912,7 @@ export default function App() {
             );
           })}
         </div>
-        <div style={dimLabel}>drag to visualize</div>
+        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.68rem', letterSpacing: '0.1em', color: 'var(--text)', textTransform: 'uppercase', textAlign: 'center', opacity: 0.65 }}>Double click to reveal</div>
       </div>
 
       {showResult && (
@@ -852,8 +920,11 @@ export default function App() {
           outcome={gaveUp ? 'lose' : 'win'}
           reveals={MAX_PICKS - picksLeft}
           onClose={() => setShowResult(false)}
+          onArchive={() => { setShowResult(false); setShowArchive(true); }}
         />
       )}
+
+      {showArchive && <ArchiveModal onClose={() => setShowArchive(false)} />}
 
       {ghostPos && ghostChar && (
         <div style={{ position: 'fixed', left: ghostPos.x - 18, top: ghostPos.y - 21 - GHOST_LIFT, width: 36, height: 42, border: '1.5px solid var(--border)', borderRadius: 4, background: 'var(--tile-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'DM Mono',monospace", fontSize: '0.9rem', fontWeight: 500, color: 'var(--text)', pointerEvents: 'none', zIndex: 9999, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', opacity: 0.9, userSelect: 'none' }}>
