@@ -401,7 +401,7 @@ function wrapPhrase(phrase) {
   let lineText = '', lineStart = 0, charPos = 0;
   for (const word of words) {
     const candidate = lineText ? lineText + ' ' + word : word;
-    if (candidate.length <= 14) { lineText = candidate; }
+    if (candidate.length <= 12) { lineText = candidate; }
     else { lines.push({ text: lineText, start: lineStart }); lineStart = charPos; lineText = word; }
     charPos += word.length + 1;
   }
@@ -823,7 +823,7 @@ export default function App() {
           return (
             <div key={pi} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {lines.map((line, lineIdx) => {
-                const isFirst = lineIdx === 0, isLast = lineIdx === lines.length - 1;
+                const isFirst = lineIdx === 0;
                 return (
                   <div key={lineIdx} style={{ display: 'flex', alignItems: 'flex-end' }}>
                     {isFirst ? <PhraseNum n={pi + 1} /> : <div style={{ width: NUM_W, flexShrink: 0 }} />}
@@ -863,17 +863,17 @@ export default function App() {
                           </div>
                         );
                       })}
-                      {isLast && !gaveUp && (won
-                        ? <div style={{ marginLeft: 8, fontSize: '1rem', color: 'var(--accent)', fontWeight: 700, alignSelf: 'center' }}>✓</div>
-                        : <>
-                            <button onClick={() => recallPhrase(pi)} disabled={!hasPlaced(pi)} title="Recall tiles" style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--dim)', width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', padding: 0, marginLeft: 8, alignSelf: 'center', flexShrink: 0, cursor: hasPlaced(pi) ? 'pointer' : 'default', opacity: hasPlaced(pi) ? 1 : 0.35, transition: 'opacity 0.2s' }}>↺</button>
-                            <button onClick={() => submitGuess(pi)} style={{ background: 'var(--accent)', border: 'none', color: '#fff', fontFamily: "'DM Mono',monospace", fontSize: '0.62rem', letterSpacing: '0.16em', textTransform: 'uppercase', padding: '0.5rem 0.7rem', borderRadius: 3, cursor: 'pointer', fontWeight: 500, marginLeft: 8, alignSelf: 'center', flexShrink: 0 }}>Submit</button>
-                          </>
-                      )}
                     </div>
                   </div>
                 );
               })}
+              {!gaveUp && (won
+                ? <div style={{ paddingLeft: NUM_W, fontSize: '1rem', color: 'var(--accent)', fontWeight: 700 }}>✓</div>
+                : <div style={{ display: 'flex', gap: 8, paddingLeft: NUM_W }}>
+                    <button onClick={() => recallPhrase(pi)} disabled={!hasPlaced(pi)} title="Recall tiles" style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--dim)', width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', padding: 0, flexShrink: 0, cursor: hasPlaced(pi) ? 'pointer' : 'default', opacity: hasPlaced(pi) ? 1 : 0.35, transition: 'opacity 0.2s' }}>↺</button>
+                    <button onClick={() => submitGuess(pi)} style={{ background: 'var(--accent)', border: 'none', color: '#fff', fontFamily: "'DM Mono',monospace", fontSize: '0.62rem', letterSpacing: '0.16em', textTransform: 'uppercase', padding: '0.5rem 0.7rem', borderRadius: 3, cursor: 'pointer', fontWeight: 500 }}>Submit</button>
+                  </div>
+              )}
             </div>
           );
         })}
