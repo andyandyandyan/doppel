@@ -24,7 +24,7 @@ const SCHEDULE_EMPTY = !Array.isArray(puzzleSchedule) || puzzleSchedule.length =
 const BAD_ENTRIES = SCHEDULE_EMPTY ? [] : puzzleSchedule.filter(e => e.phrase1.trim().length !== e.phrase2.trim().length);
 const PUZZLE_ERROR = SCHEDULE_EMPTY || BAD_ENTRIES.length > 0;
 
-let PUZZLE = { p1: '', p2: '' }, PUZZLE_DATE = '', PUZZLE_CLUE = '';
+let PUZZLE = { p1: '', p2: '' }, PUZZLE_DATE = '', PUZZLE_DATE_ISO = '', PUZZLE_CLUE = '';
 let ARCHIVE_ENTRIES = [], IS_ARCHIVE_MODE = false;
 if (!PUZZLE_ERROR) {
   const sorted = [...puzzleSchedule].sort((a, b) => a.date.localeCompare(b.date));
@@ -35,6 +35,7 @@ if (!PUZZLE_ERROR) {
   IS_ARCHIVE_MODE = !!archiveParam && selected.date !== todaySelected.date;
   PUZZLE = { p1: selected.phrase1.trim().toUpperCase(), p2: selected.phrase2.trim().toUpperCase() };
   PUZZLE_DATE = formatDisplayDate(selected.date);
+  PUZZLE_DATE_ISO = selected.date;
   PUZZLE_CLUE = selected.title;
   ARCHIVE_ENTRIES = sorted.filter(e => e.date < today).reverse(); // most recent first
 }
@@ -47,6 +48,13 @@ const GHOST_LIFT = 56; // lift the dragged tile above a finger on touch devices
 // finger position). Disable the `draggable` attribute on touch devices so only our
 // custom touch logic ever drives a drag there; mouse/desktop keeps native DnD.
 const IS_TOUCH = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+
+const RESULTS_KEY = 'doppel-results';
+function loadResults() { try { return JSON.parse(localStorage.getItem(RESULTS_KEY) || '{}'); } catch { return {}; } }
+function saveResult(dateISO, outcome, reveals) { const r = loadResults(); r[dateISO] = { outcome, reveals }; localStorage.setItem(RESULTS_KEY, JSON.stringify(r)); }
+// Both phrases have spaces at identical indices → either answer is valid in either slot with no reveals used.
+const SPACES_MIRROR = !PUZZLE_ERROR && (() => { const { p1, p2 } = PUZZLE; for (let i = 0; i < p1.length; i++) if ((p1[i] === ' ') !== (p2[i] === ' ')) return false; return true; })();
+const PREV_RESULT = !PUZZLE_ERROR && !IS_ARCHIVE_MODE ? (loadResults()[PUZZLE_DATE_ISO] || null) : null;
 
 // ─── Demo data for help screens ───────────────────────────────────────────────
 const DP1 = 'KEVIN BACON';
@@ -409,6 +417,35 @@ function wrapPhrase(phrase) {
   return lines;
 }
 
+// ─── Stats modal ──────────────────────────────────────────────────────────────
+function StatsModal({ onClose }) {
+  const results = loadResults();
+  const entries = Object.values(results);
+  const wins = entries.filter(e => e.outcome === 'win');
+  const losses = entries.filter(e => e.outcome === 'lose');
+  const played = entries.length;
+  const winPct = played ? Math.round(wins.length / played * 100) : 0;
+  const byReveals = [0, 1, 2, 3].map(n => wins.filter(e => e.reveals === n).length);
+  const row = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.45rem 0', borderBottom: '1px solid var(--border-dim)' };
+  const lbl = { fontFamily: "'DM Mono',monospace", fontSize: '0.68rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--dim)' };
+  const val = { fontFamily: "'DM Mono',monospace", fontSize: '1rem', fontWeight: 700, color: 'var(--accent)' };
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem' }} onClick={onClose}>
+      <div style={{ position: 'relative', background: 'var(--bg)', borderRadius: 10, maxWidth: 320, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', padding: '1.8rem 1.6rem' }} onClick={e => e.stopPropagation()}>
+        <button onClick={onClose} style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--dim)', fontSize: '1.2rem', lineHeight: 1, padding: 0 }}>×</button>
+        <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '1.3rem', color: 'var(--accent)', marginBottom: '1.2rem' }}>My Stats</div>
+        <div style={row}><span style={lbl}>Played</span><span style={val}>{played}</span></div>
+        <div style={{ ...row, marginBottom: '0.6rem' }}><span style={lbl}>Win %</span><span style={val}>{winPct}</span></div>
+        <div style={row}><span style={lbl}>Perfect (no reveals)</span><span style={val}>{byReveals[0]}</span></div>
+        <div style={row}><span style={lbl}>1 reveal</span><span style={val}>{byReveals[1]}</span></div>
+        <div style={row}><span style={lbl}>2 reveals</span><span style={val}>{byReveals[2]}</span></div>
+        <div style={row}><span style={lbl}>3 reveals</span><span style={val}>{byReveals[3]}</span></div>
+        <div style={{ ...row, borderBottom: 'none' }}><span style={lbl}>Gave up</span><span style={val}>{losses.length}</span></div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Archive modal ─────────────────────────────────────────────────────────────
 function ArchiveModal({ onClose }) {
   const rowStyle = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border-dim)', cursor: 'pointer', textDecoration: 'none', color: 'inherit' };
@@ -419,15 +456,24 @@ function ArchiveModal({ onClose }) {
         <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '1.3rem', color: 'var(--accent)', marginBottom: '1rem' }}>Past puzzles</div>
         {ARCHIVE_ENTRIES.length === 0
           ? <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', color: 'var(--dim)', textAlign: 'center', padding: '1rem 0' }}>No past puzzles yet.</div>
-          : ARCHIVE_ENTRIES.map(e => (
-            <a key={e.date} href={`?date=${e.date}`} style={rowStyle}>
-              <div>
-                <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.62rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--dim)' }}>{formatDisplayDate(e.date)}</div>
-                <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '1rem', color: 'var(--text)', marginTop: 2 }}>"{e.title}"</div>
-              </div>
-              <div style={{ color: 'var(--dim)', fontSize: '0.9rem', flexShrink: 0, marginLeft: 8 }}>›</div>
-            </a>
-          ))
+          : ARCHIVE_ENTRIES.map(e => {
+            const res = loadResults()[e.date];
+            return (
+              <a key={e.date} href={`?date=${e.date}`} style={rowStyle}>
+                <div>
+                  <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.62rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--dim)' }}>{formatDisplayDate(e.date)}</div>
+                  <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '1rem', color: 'var(--text)', marginTop: 2 }}>"{e.title}"</div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 8 }}>
+                  {res && (res.outcome === 'win'
+                    ? <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.72rem', color: 'var(--accent)', letterSpacing: '0.04em' }}>{res.reveals === 0 ? '★' : '●'.repeat(res.reveals)}</span>
+                    : <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.72rem', color: 'var(--dim)' }}>✗</span>
+                  )}
+                  <div style={{ color: 'var(--dim)', fontSize: '0.9rem' }}>›</div>
+                </div>
+              </a>
+            );
+          })
         }
       </div>
     </div>
@@ -437,6 +483,7 @@ function ArchiveModal({ onClose }) {
 // ─── Result modal ──────────────────────────────────────────────────────────────
 function ResultModal({ outcome, reveals, onClose, onArchive }) {
   const [copied, setCopied] = useState(false);
+  const [showStats, setShowStats] = useState(false);
   const win = outcome === 'win';
   const heading = win ? (reveals === 0 ? 'Perfect!' : 'Nice!') : 'Better luck next time!';
   const dots = '🔵'.repeat(reveals);
@@ -481,8 +528,10 @@ function ResultModal({ outcome, reveals, onClose, onArchive }) {
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={doShare} style={shareBtn}>Share</button>
           <button onClick={onArchive} style={ghostBtn}>Archive</button>
+          <button onClick={() => setShowStats(true)} style={ghostBtn}>Stats</button>
         </div>
       </div>
+      {showStats && <StatsModal onClose={() => setShowStats(false)} />}
     </div>
   );
 }
@@ -491,33 +540,40 @@ function ResultModal({ outcome, reveals, onClose, onArchive }) {
 export default function App() {
   const { p1, p2 } = PUZZLE;
   const COMMON = getCommon(p1, p2);
+  const isAlreadyPlayed = !!PREV_RESULT;
 
   const [pool, setPool] = useState(() => getPool(p1, p2));
-  const [rev1, setRev1] = useState(() => { const s = new Set(COMMON); for (let i = 0; i < p1.length; i++) if (p1[i] === ' ') s.add(i); return s; });
-  const [rev2, setRev2] = useState(() => { const s = new Set(COMMON); for (let i = 0; i < p2.length; i++) if (p2[i] === ' ') s.add(i); return s; });
+  const [rev1, setRev1] = useState(() => {
+    if (isAlreadyPlayed) return new Set(Array.from({ length: p1.length }, (_, i) => i));
+    const s = new Set(COMMON); for (let i = 0; i < p1.length; i++) if (p1[i] === ' ') s.add(i); return s;
+  });
+  const [rev2, setRev2] = useState(() => {
+    if (isAlreadyPlayed) return new Set(Array.from({ length: p2.length }, (_, i) => i));
+    const s = new Set(COMMON); for (let i = 0; i < p2.length; i++) if (p2[i] === ' ') s.add(i); return s;
+  });
   const [tentative, setTent]  = useState(new Map());
-  const [picksLeft, setPicks] = useState(MAX_PICKS);
+  const [picksLeft, setPicks] = useState(isAlreadyPlayed ? MAX_PICKS - PREV_RESULT.reveals : MAX_PICKS);
   const [dragging,  setDrag]  = useState(null);
   const [typed1,    setTyped1] = useState({});
   const [typed2,    setTyped2] = useState({});
   const [focus1,    setFocus1] = useState(null);
   const [focus2,    setFocus2] = useState(null);
-  const [won1,      setWon1]  = useState(false);
-  const [won2,      setWon2]  = useState(false);
+  const [won1,      setWon1]  = useState(isAlreadyPlayed && PREV_RESULT.outcome === 'win');
+  const [won2,      setWon2]  = useState(isAlreadyPlayed && PREV_RESULT.outcome === 'win');
   const [err1,      setErr1]  = useState(false);
   const [err2,      setErr2]  = useState(false);
   const [pendingTile, setPendingTile] = useState(null);
   const [touchDragSlot, setTouchDragSlot] = useState(null);
   const [ghostPos,  setGhostPos]  = useState(null);
   const [ghostChar, setGhostChar] = useState(null);
-  const [gaveUp,    setGaveUp]   = useState(false);
+  const [gaveUp,    setGaveUp]   = useState(isAlreadyPlayed && PREV_RESULT.outcome === 'lose');
   const [giveUpRev1, setGiveUpRev1] = useState(new Set());
   const [giveUpRev2, setGiveUpRev2] = useState(new Set());
-  const [showResult, setShowResult] = useState(false);
+  const [showResult, setShowResult] = useState(isAlreadyPlayed);
   const [showArchive, setShowArchive] = useState(false);
 
-  // Help
-  const [showHelp, setShowHelp] = useState(() => !localStorage.getItem(HELP_KEY));
+  // Help — skip for archive visits and for players returning to a puzzle they already finished
+  const [showHelp, setShowHelp] = useState(() => !localStorage.getItem(HELP_KEY) && !IS_ARCHIVE_MODE && !isAlreadyPlayed);
   const [helpPage, setHelpPage] = useState(0);
   const [dontShow, setDontShow] = useState(false);
   // Carousel drag
@@ -552,6 +608,7 @@ export default function App() {
     if (won1 && won2) setShowResult(true);
   }, [won1, won2]);
 
+
   function handleGiveUp() {
     setGaveUp(true);
     setPendingTile(null);
@@ -562,6 +619,7 @@ export default function App() {
     const p2Start = START + pending1.length * STEP + GAP;
     pending2.forEach((idx, k) => setTimeout(() => setGiveUpRev2(s => new Set([...s, idx])), p2Start + k * STEP));
     const total = p2Start + pending2.length * STEP + 700;
+    saveResult(PUZZLE_DATE_ISO, 'lose', MAX_PICKS - picksLeft);
     setTimeout(() => setShowResult(true), total);
   }
 
@@ -744,9 +802,14 @@ export default function App() {
 
   function submitGuess(pi) {
     const phrase = pi === 0 ? p1 : p2;
-    if (buildGuess(pi) === phrase) {
+    const altPhrase = pi === 0 ? p2 : p1;
+    const guess = buildGuess(pi);
+    const correct = guess === phrase || (SPACES_MIRROR && picksLeft === MAX_PICKS && guess === altPhrase);
+    if (correct) {
       const setRev = pi === 0 ? setRev1 : setRev2;
       setRev(new Set(Array.from({ length: phrase.length }, (_, i) => i)));
+      const otherWon = pi === 0 ? won2 : won1;
+      if (otherWon && !isAlreadyPlayed) saveResult(PUZZLE_DATE_ISO, 'win', MAX_PICKS - picksLeft);
       if (pi === 0) setWon1(true); else setWon2(true);
     } else {
       const setErr = pi === 0 ? setErr1 : setErr2;
