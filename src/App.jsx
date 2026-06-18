@@ -560,6 +560,10 @@ export default function App() {
   const [focus2,    setFocus2] = useState(null);
   const [won1,      setWon1]  = useState(isAlreadyPlayed && PREV_RESULT.outcome === 'win');
   const [won2,      setWon2]  = useState(isAlreadyPlayed && PREV_RESULT.outcome === 'win');
+  // Tracks which phrase string to display when a slot is revealed (may differ from canonical
+  // if the player used the symmetric swap — e.g. guessed p2 in slot 0 with no reveals).
+  const [accepted0, setAccepted0] = useState(p1);
+  const [accepted1, setAccepted1] = useState(p2);
   const [err1,      setErr1]  = useState(false);
   const [err2,      setErr2]  = useState(false);
   const [pendingTile, setPendingTile] = useState(null);
@@ -804,8 +808,10 @@ export default function App() {
     const phrase = pi === 0 ? p1 : p2;
     const altPhrase = pi === 0 ? p2 : p1;
     const guess = buildGuess(pi);
-    const correct = guess === phrase || (SPACES_MIRROR && picksLeft === MAX_PICKS && guess === altPhrase);
+    const usedSwap = SPACES_MIRROR && picksLeft === MAX_PICKS && guess === altPhrase && guess !== phrase;
+    const correct = guess === phrase || usedSwap;
     if (correct) {
+      if (usedSwap) { if (pi === 0) setAccepted0(p2); else setAccepted1(p1); }
       const setRev = pi === 0 ? setRev1 : setRev2;
       setRev(new Set(Array.from({ length: phrase.length }, (_, i) => i)));
       const otherWon = pi === 0 ? won2 : won1;
@@ -901,7 +907,7 @@ export default function App() {
                             style={{ width: SLOT_W, height: 38, flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: `2px solid ${borderColor}`, background: canDrop && !tentChar && !revealed ? 'var(--accent-dim)' : 'transparent', borderRadius: canDrop && !tentChar && !revealed ? '3px 3px 0 0' : 0, transition: 'background 0.12s, border-color 0.2s' }}
                             onDragOver={e => { if (!revealed) e.preventDefault(); }}
                             onDrop={e => { e.preventDefault(); handleDropOnSlot(pi, i); }}>
-                            {revealed && <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', fontWeight: 500, color: isGiveUpReveal ? 'var(--text)' : 'var(--accent)', userSelect: 'none' }}>{ch}</span>}
+                            {revealed && <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', fontWeight: 500, color: isGiveUpReveal ? 'var(--text)' : 'var(--accent)', userSelect: 'none' }}>{isGiveUpReveal ? ch : (pi === 0 ? accepted0 : accepted1)[i]}</span>}
                             {!revealed && !gaveUp && tentChar && (
                               <div draggable={!IS_TOUCH} {...slotTileTouch(pi, i, tentChar)}
                                 onDragStart={e => { e.stopPropagation(); startDragFromSlot(pi, i, tentChar); }} onDragEnd={handleDragEnd}
