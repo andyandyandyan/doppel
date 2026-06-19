@@ -51,10 +51,19 @@ const IS_TOUCH = typeof window !== 'undefined' && ('ontouchstart' in window || n
 
 const RESULTS_KEY = 'doppel-results';
 function loadResults() { try { return JSON.parse(localStorage.getItem(RESULTS_KEY) || '{}'); } catch { return {}; } }
-function saveResult(dateISO, outcome, reveals) { const r = loadResults(); r[dateISO] = { outcome, reveals }; localStorage.setItem(RESULTS_KEY, JSON.stringify(r)); }
+const PROGRESS_KEY = 'doppel-progress';
+function clearProgress() { localStorage.removeItem(PROGRESS_KEY); }
+function saveResult(dateISO, outcome, reveals) { const r = loadResults(); r[dateISO] = { outcome, reveals }; localStorage.setItem(RESULTS_KEY, JSON.stringify(r)); clearProgress(); }
 // Both phrases have spaces at identical indices → either answer is valid in either slot with no reveals used.
 const SPACES_MIRROR = !PUZZLE_ERROR && (() => { const { p1, p2 } = PUZZLE; for (let i = 0; i < p1.length; i++) if ((p1[i] === ' ') !== (p2[i] === ' ')) return false; return true; })();
 const PREV_RESULT = !PUZZLE_ERROR && !IS_ARCHIVE_MODE ? (loadResults()[PUZZLE_DATE_ISO] || null) : null;
+// In-progress state for mid-game refreshes. Only used for non-archive, not-yet-completed puzzles.
+function loadProgress() {
+  if (IS_ARCHIVE_MODE || PREV_RESULT) return null;
+  try { const s = JSON.parse(localStorage.getItem(PROGRESS_KEY) || 'null'); return s?.date === PUZZLE_DATE_ISO ? s : null; } catch { return null; }
+}
+function saveProgress(s) { if (IS_ARCHIVE_MODE) return; localStorage.setItem(PROGRESS_KEY, JSON.stringify({ date: PUZZLE_DATE_ISO, ...s })); }
+const SAVED_PROGRESS = !PUZZLE_ERROR ? loadProgress() : null;
 
 // ─── Demo data for help screens ───────────────────────────────────────────────
 const DP1 = 'KEVIN BACON';
@@ -541,29 +550,32 @@ export default function App() {
   const { p1, p2 } = PUZZLE;
   const COMMON = getCommon(p1, p2);
   const isAlreadyPlayed = !!PREV_RESULT;
+  const sp = SAVED_PROGRESS;
 
-  const [pool, setPool] = useState(() => getPool(p1, p2));
+  const [pool, setPool] = useState(() => sp?.pool ?? getPool(p1, p2));
   const [rev1, setRev1] = useState(() => {
     if (isAlreadyPlayed) return new Set(Array.from({ length: p1.length }, (_, i) => i));
+    if (sp) return new Set(sp.rev1);
     const s = new Set(COMMON); for (let i = 0; i < p1.length; i++) if (p1[i] === ' ') s.add(i); return s;
   });
   const [rev2, setRev2] = useState(() => {
     if (isAlreadyPlayed) return new Set(Array.from({ length: p2.length }, (_, i) => i));
+    if (sp) return new Set(sp.rev2);
     const s = new Set(COMMON); for (let i = 0; i < p2.length; i++) if (p2[i] === ' ') s.add(i); return s;
   });
-  const [tentative, setTent]  = useState(new Map());
-  const [picksLeft, setPicks] = useState(isAlreadyPlayed ? MAX_PICKS - PREV_RESULT.reveals : MAX_PICKS);
+  const [tentative, setTent]  = useState(() => sp ? new Map(sp.tentative) : new Map());
+  const [picksLeft, setPicks] = useState(isAlreadyPlayed ? MAX_PICKS - PREV_RESULT.reveals : (sp?.picksLeft ?? MAX_PICKS));
   const [dragging,  setDrag]  = useState(null);
-  const [typed1,    setTyped1] = useState({});
-  const [typed2,    setTyped2] = useState({});
+  const [typed1,    setTyped1] = useState(() => sp?.typed1 ?? {});
+  const [typed2,    setTyped2] = useState(() => sp?.typed2 ?? {});
   const [focus1,    setFocus1] = useState(null);
   const [focus2,    setFocus2] = useState(null);
-  const [won1,      setWon1]  = useState(isAlreadyPlayed && PREV_RESULT.outcome === 'win');
-  const [won2,      setWon2]  = useState(isAlreadyPlayed && PREV_RESULT.outcome === 'win');
+  const [won1,      setWon1]  = useState((isAlreadyPlayed && PREV_RESULT.outcome === 'win') || (sp?.won1 ?? false));
+  const [won2,      setWon2]  = useState((isAlreadyPlayed && PREV_RESULT.outcome === 'win') || (sp?.won2 ?? false));
   // Tracks which phrase string to display when a slot is revealed (may differ from canonical
   // if the player used the symmetric swap — e.g. guessed p2 in slot 0 with no reveals).
-  const [accepted0, setAccepted0] = useState(p1);
-  const [accepted1, setAccepted1] = useState(p2);
+  const [accepted0, setAccepted0] = useState(sp?.accepted0 ?? p1);
+  const [accepted1, setAccepted1] = useState(sp?.accepted1 ?? p2);
   const [err1,      setErr1]  = useState(false);
   const [err2,      setErr2]  = useState(false);
   const [pendingTile, setPendingTile] = useState(null);
@@ -576,8 +588,8 @@ export default function App() {
   const [showResult, setShowResult] = useState(isAlreadyPlayed);
   const [showArchive, setShowArchive] = useState(false);
 
-  // Help — skip for archive visits and for players returning to a puzzle they already finished
-  const [showHelp, setShowHelp] = useState(() => !localStorage.getItem(HELP_KEY) && !IS_ARCHIVE_MODE && !isAlreadyPlayed);
+  // Help — skip for archive visits, already-finished puzzles, and mid-game refreshes
+  const [showHelp, setShowHelp] = useState(() => !localStorage.getItem(HELP_KEY) && !IS_ARCHIVE_MODE && !isAlreadyPlayed && !sp);
   const [helpPage, setHelpPage] = useState(0);
   const [dontShow, setDontShow] = useState(false);
   // Carousel drag
@@ -612,6 +624,18 @@ export default function App() {
     if (won1 && won2) setShowResult(true);
   }, [won1, won2]);
 
+  // Persist mid-game state so a refresh doesn't start the puzzle over.
+  useEffect(() => {
+    if (IS_ARCHIVE_MODE || isAlreadyPlayed) return;
+    if ((won1 && won2) || gaveUp) { clearProgress(); return; }
+    saveProgress({
+      rev1: [...rev1], rev2: [...rev2],
+      tentative: [...tentative],
+      typed1, typed2,
+      picksLeft, won1, won2,
+      pool, accepted0, accepted1,
+    });
+  }, [rev1, rev2, tentative, typed1, typed2, picksLeft, won1, won2, gaveUp, pool, accepted0, accepted1]);
 
   function handleGiveUp() {
     setGaveUp(true);
