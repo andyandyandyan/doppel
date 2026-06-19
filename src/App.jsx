@@ -39,7 +39,7 @@ if (!PUZZLE_ERROR) {
   PUZZLE_CLUE = selected.title;
   ARCHIVE_ENTRIES = sorted.filter(e => e.date < today).reverse(); // most recent first
 }
-const MAX_PICKS = 3;
+const MAX_PICKS = 5;
 const HELP_KEY = 'doppel-help-seen';
 const GHOST_LIFT = 56; // lift the dragged tile above a finger on touch devices
 // Some mobile browsers (notably Android Chrome) will start a *native* HTML5 drag
