@@ -59,10 +59,10 @@ const SPACES_MIRROR = !PUZZLE_ERROR && (() => { const { p1, p2 } = PUZZLE; for (
 const PREV_RESULT = !PUZZLE_ERROR && !IS_ARCHIVE_MODE ? (loadResults()[PUZZLE_DATE_ISO] || null) : null;
 // In-progress state for mid-game refreshes. Only used for non-archive, not-yet-completed puzzles.
 function loadProgress() {
-  if (IS_ARCHIVE_MODE || PREV_RESULT) return null;
+  if (PREV_RESULT) return null;
   try { const s = JSON.parse(localStorage.getItem(PROGRESS_KEY) || 'null'); return s?.date === PUZZLE_DATE_ISO ? s : null; } catch { return null; }
 }
-function saveProgress(s) { if (IS_ARCHIVE_MODE) return; localStorage.setItem(PROGRESS_KEY, JSON.stringify({ date: PUZZLE_DATE_ISO, ...s })); }
+function saveProgress(s) { localStorage.setItem(PROGRESS_KEY, JSON.stringify({ date: PUZZLE_DATE_ISO, ...s })); }
 const SAVED_PROGRESS = !PUZZLE_ERROR ? loadProgress() : null;
 
 // ─── Demo data for help screens ───────────────────────────────────────────────
@@ -626,7 +626,7 @@ export default function App() {
 
   // Persist mid-game state so a refresh doesn't start the puzzle over.
   useEffect(() => {
-    if (IS_ARCHIVE_MODE || isAlreadyPlayed) return;
+    if (isAlreadyPlayed) return;
     if ((won1 && won2) || gaveUp) { clearProgress(); return; }
     saveProgress({
       rev1: [...rev1], rev2: [...rev2],
