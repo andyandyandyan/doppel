@@ -686,8 +686,15 @@ export default function App() {
 
   // ── Drag handlers ────────────────────────────────────────────────────────
   function startDragFromPool(ch, idx) { poolDragIdx.current = idx; dragSrc.current = null; setDrag(ch); }
-  function startDragFromSlot(pi, idx, ch) { dragSrc.current = { pi, idx, ch }; setTent(m => { const n = new Map(m); n.delete(`${pi}-${idx}`); return n; }); setDrag(ch); }
-  function handleDragEnd() { poolDragIdx.current = null; dragSrc.current = null; setDrag(null); }
+  function startDragFromSlot(pi, idx, ch) {
+    dragSrc.current = { pi, idx, ch };
+    // Do NOT remove from tentative here — removing the DOM node during dragstart causes
+    // browsers to fire dragend immediately, killing the drag before drop can register.
+    // Instead, hide it visually and remove it only on a confirmed drop.
+    setTouchDragSlot({ pi, idx });
+    setDrag(ch);
+  }
+  function handleDragEnd() { poolDragIdx.current = null; dragSrc.current = null; setTouchDragSlot(null); setDrag(null); }
 
   function startTouchDrag(source, ch, x, y) {
     touchStateRef.current.isDragging = true;
@@ -768,7 +775,13 @@ export default function App() {
     if (!dragging) return;
     const rev = pi === 0 ? rev1 : rev2;
     if (rev.has(idx)) return;
-    setTent(m => new Map(m).set(`${pi}-${idx}`, dragging));
+    setTent(m => {
+      const n = new Map(m);
+      if (dragSrc.current) n.delete(`${dragSrc.current.pi}-${dragSrc.current.idx}`);
+      n.set(`${pi}-${idx}`, dragging);
+      return n;
+    });
+    setTouchDragSlot(null);
     dragSrc.current = null; setDrag(null);
   }
 
