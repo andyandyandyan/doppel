@@ -775,14 +775,16 @@ export default function App() {
     if (!dragging) return;
     const rev = pi === 0 ? rev1 : rev2;
     if (rev.has(idx)) return;
+    const src = dragSrc.current; // capture before clearing — ref may be nulled before updater runs
+    dragSrc.current = null;
     setTent(m => {
       const n = new Map(m);
-      if (dragSrc.current) n.delete(`${dragSrc.current.pi}-${dragSrc.current.idx}`);
+      if (src) n.delete(`${src.pi}-${src.idx}`);
       n.set(`${pi}-${idx}`, dragging);
       return n;
     });
     setTouchDragSlot(null);
-    dragSrc.current = null; setDrag(null);
+    setDrag(null);
   }
 
   // ── Reveal / guess handlers ──────────────────────────────────────────────
