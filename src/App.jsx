@@ -553,7 +553,7 @@ function ResultModal({ outcome, reveals, onClose, onArchive }) {
     `doppel — ${PUZZLE_DATE}`,
     `"${PUZZLE_CLUE}"`,
     win ? `${heading}${dots ? ' ' + dots : ''}` : `Gave up${dots ? ' ' + dots : ''}`,
-    typeof window !== 'undefined' ? window.location.href : '',
+    IS_ARCHIVE_MODE ? `doppel.fyi/?date=${PUZZLE_DATE_ISO}` : 'doppel.fyi',
   ].filter(Boolean).join('\n');
 
   async function doShare() {
