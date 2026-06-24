@@ -795,7 +795,7 @@ export default function App() {
         const { startPos, isDragging } = touchStateRef.current; if (!startPos) return;
         const t = e.touches[0];
         if (!isDragging && Math.hypot(t.clientX - startPos.x, t.clientY - startPos.y) > TH) {
-          if (allInstancesRevealed(ch, p1, p2, rev1, rev2)) return;
+          if (allInstancesRevealed(ch, accepted0, accepted1, rev1, rev2)) return;
           startTouchDrag({ type: 'pool', ch, poolIdx: i }, ch, t.clientX, t.clientY);
         } else if (isDragging) { setGhostPos({ x: t.clientX, y: t.clientY }); }
       },
@@ -841,22 +841,22 @@ export default function App() {
 
   // ── Reveal / guess handlers ──────────────────────────────────────────────
   function handleTileClick(ch) {
-    if (gaveUp || allInstancesRevealed(ch, p1, p2, rev1, rev2)) return;
+    if (gaveUp || allInstancesRevealed(ch, accepted0, accepted1, rev1, rev2)) return;
     if (pendingTile === ch) { handleReveal(ch); setPendingTile(null); }
     else { setPendingTile(ch); }
   }
 
   function handleReveal(ch) {
-    if (picksLeft <= 0 || allInstancesRevealed(ch, p1, p2, rev1, rev2)) return;
+    if (picksLeft <= 0 || allInstancesRevealed(ch, accepted0, accepted1, rev1, rev2)) return;
     const nr1 = new Set(rev1), nr2 = new Set(rev2);
-    for (let i = 0; i < p1.length; i++) if (p1[i] === ch) nr1.add(i);
-    for (let i = 0; i < p2.length; i++) if (p2[i] === ch) nr2.add(i);
+    for (let i = 0; i < accepted0.length; i++) if (accepted0[i] === ch) nr1.add(i);
+    for (let i = 0; i < accepted1.length; i++) if (accepted1[i] === ch) nr2.add(i);
     setRev1(nr1); setRev2(nr2);
     const t = new Map(tentative);
     for (const [key, val] of tentative) if (val === ch) t.delete(key);
     setTent(t);
-    setTyped1(td => { const n = { ...td }; for (let i = 0; i < p1.length; i++) if (p1[i] === ch) delete n[i]; return n; });
-    setTyped2(td => { const n = { ...td }; for (let i = 0; i < p2.length; i++) if (p2[i] === ch) delete n[i]; return n; });
+    setTyped1(td => { const n = { ...td }; for (let i = 0; i < accepted0.length; i++) if (accepted0[i] === ch) delete n[i]; return n; });
+    setTyped2(td => { const n = { ...td }; for (let i = 0; i < accepted1.length; i++) if (accepted1[i] === ch) delete n[i]; return n; });
     setPicks(p => p - 1);
   }
 
