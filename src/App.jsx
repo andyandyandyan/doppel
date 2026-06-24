@@ -7,8 +7,18 @@ import puzzleSchedule from '../puzzle.json';
 // earlier (in the visitor's local time) is the one that plays. Add as many
 // future entries as you like; nothing else needs to change day to day.
 function todayISO() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date());
+  const get = t => parseInt(parts.find(p => p.type === t).value);
+  let [y, mo, d, h] = [get('year'), get('month'), get('day'), get('hour')];
+  if (h < 3) {
+    const prev = new Date(y, mo - 1, d - 1);
+    [y, mo, d] = [prev.getFullYear(), prev.getMonth() + 1, prev.getDate()];
+  }
+  return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 function parseLocalDate(iso) {
   const [y, m, d] = iso.split('-').map(Number);
