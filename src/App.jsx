@@ -455,34 +455,86 @@ function StatsModal({ onClose }) {
   );
 }
 
-// ─── Archive modal ─────────────────────────────────────────────────────────────
+// ─── Archive modal (calendar view) ────────────────────────────────────────────
 function ArchiveModal({ onClose }) {
-  const rowStyle = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.65rem 0', borderBottom: '1px solid var(--border-dim)', cursor: 'pointer', textDecoration: 'none', color: 'inherit' };
+  const results = loadResults();
+  const puzzleByDate = {};
+  ARCHIVE_ENTRIES.forEach(e => { puzzleByDate[e.date] = e; });
+
+  const seed = ARCHIVE_ENTRIES.length > 0 ? parseLocalDate(ARCHIVE_ENTRIES[0].date) : parseLocalDate(todayISO());
+  const [viewYear,  setViewYear]  = useState(seed.getFullYear());
+  const [viewMonth, setViewMonth] = useState(seed.getMonth());
+
+  const earliest = ARCHIVE_ENTRIES.length > 0 ? parseLocalDate(ARCHIVE_ENTRIES[ARCHIVE_ENTRIES.length - 1].date) : seed;
+  const today    = parseLocalDate(todayISO());
+  const canBack  = viewYear > earliest.getFullYear() || (viewYear === earliest.getFullYear() && viewMonth > earliest.getMonth());
+  const canFwd   = viewYear < today.getFullYear()    || (viewYear === today.getFullYear()    && viewMonth < today.getMonth());
+
+  function goBack()    { if (viewMonth === 0)  { setViewYear(y => y - 1); setViewMonth(11); } else setViewMonth(m => m - 1); }
+  function goForward() { if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0);  } else setViewMonth(m => m + 1); }
+
+  const firstOfMonth = new Date(viewYear, viewMonth, 1);
+  const daysInMonth  = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const startDow     = firstOfMonth.getDay(); // 0 = Sun
+  const monthLabel   = firstOfMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  // Build cell array: nulls for leading blanks, then day numbers
+  const cells = [...Array(startDow).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+  while (cells.length % 7 !== 0) cells.push(null); // complete last row
+
+  const navBtn = { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontFamily: "'DM Mono',monospace", fontSize: '1.1rem', padding: '0.2rem 0.6rem', lineHeight: 1 };
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }} onClick={onClose}>
-      <div style={{ position: 'relative', background: 'var(--bg)', borderRadius: 10, maxWidth: 340, width: '100%', maxHeight: '80dvh', overflowY: 'auto', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', padding: '1.6rem' }} onClick={e => e.stopPropagation()}>
+      <div style={{ position: 'relative', background: 'var(--bg)', borderRadius: 10, maxWidth: 340, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', padding: '1.4rem 1.6rem 1.6rem' }} onClick={e => e.stopPropagation()}>
         <button onClick={onClose} style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--dim)', fontSize: '1.2rem', lineHeight: 1, padding: 0 }}>×</button>
+
         <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '1.3rem', color: 'var(--accent)', marginBottom: '1rem' }}>Past puzzles</div>
+
         {ARCHIVE_ENTRIES.length === 0
           ? <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', color: 'var(--dim)', textAlign: 'center', padding: '1rem 0' }}>No past puzzles yet.</div>
-          : ARCHIVE_ENTRIES.map(e => {
-            const res = loadResults()[e.date];
-            return (
-              <a key={e.date} href={`?date=${e.date}`} style={rowStyle}>
-                <div>
-                  <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.62rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--dim)' }}>{formatDisplayDate(e.date)}</div>
-                  <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '1rem', color: 'var(--text)', marginTop: 2 }}>"{e.title}"</div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 8 }}>
-                  {res && (res.outcome === 'win'
-                    ? <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.72rem', color: 'var(--accent)', letterSpacing: '0.04em' }}>{res.reveals === 0 ? '★' : '●'.repeat(res.reveals)}</span>
-                    : <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.72rem', color: 'var(--dim)' }}>✗</span>
-                  )}
-                  <div style={{ color: 'var(--dim)', fontSize: '0.9rem' }}>›</div>
-                </div>
-              </a>
-            );
-          })
+          : <>
+              {/* Month nav */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.7rem' }}>
+                <button onClick={goBack}    disabled={!canBack} style={{ ...navBtn, opacity: canBack ? 1 : 0.25 }}>←</button>
+                <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.7rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text)' }}>{monthLabel}</span>
+                <button onClick={goForward} disabled={!canFwd}  style={{ ...navBtn, opacity: canFwd  ? 1 : 0.25 }}>→</button>
+              </div>
+
+              {/* Day-of-week headers */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: '0.25rem' }}>
+                {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => (
+                  <div key={d} style={{ textAlign: 'center', fontFamily: "'DM Mono',monospace", fontSize: '0.55rem', letterSpacing: '0.06em', color: 'var(--dim)', paddingBottom: '0.2rem' }}>{d}</div>
+                ))}
+              </div>
+
+              {/* Calendar grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
+                {cells.map((day, ci) => {
+                  if (!day) return <div key={ci} />;
+                  const dateISO = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                  const puzzle  = puzzleByDate[dateISO];
+                  const res     = puzzle ? results[dateISO] : null;
+
+                  if (!puzzle) return (
+                    <div key={ci} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 38, fontFamily: "'DM Mono',monospace", fontSize: '0.72rem', color: 'var(--border)', borderRadius: 5 }}>
+                      {day}
+                    </div>
+                  );
+
+                  const won       = res?.outcome === 'win';
+                  const indicator = !res ? null : won ? (res.reveals === 0 ? '★' : '●'.repeat(res.reveals)) : '✗';
+
+                  return (
+                    <a key={ci} href={`?date=${dateISO}`} title={`"${puzzle.title}"`}
+                      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 38, borderRadius: 5, textDecoration: 'none', cursor: 'pointer', background: res ? 'rgba(74,143,168,0.13)' : 'rgba(74,143,168,0.07)', border: `1px solid ${res ? 'rgba(74,143,168,0.35)' : 'rgba(74,143,168,0.18)'}`, gap: 1 }}>
+                      <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', fontWeight: 500, color: 'var(--accent)', lineHeight: 1 }}>{day}</span>
+                      {indicator && <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.5rem', color: won ? 'var(--accent)' : 'var(--dim)', lineHeight: 1, letterSpacing: '0.03em' }}>{indicator}</span>}
+                    </a>
+                  );
+                })}
+              </div>
+            </>
         }
       </div>
     </div>
