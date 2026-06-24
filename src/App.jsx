@@ -904,22 +904,16 @@ export default function App() {
     if (correct) {
       const allIdx = new Set(Array.from({ length: phrase.length }, (_, i) => i));
       if (usedSwap) {
-        // Winning with swapped phrases — reveal both slots simultaneously
-        if (pi === 0) {
-          setAccepted0(p2); setRev1(allIdx); setWon1(true);
-          if (!won2) { setAccepted1(p1); setRev2(allIdx); setWon2(true); }
-        } else {
-          setAccepted1(p1); setRev2(allIdx); setWon2(true);
-          if (!won1) { setAccepted0(p2); setRev1(allIdx); setWon1(true); }
-        }
-        if (!isAlreadyPlayed) saveResult(PUZZLE_DATE_ISO, 'win', MAX_PICKS - picksLeft);
-      } else {
-        const setRev = pi === 0 ? setRev1 : setRev2;
-        setRev(allIdx);
-        const otherWon = pi === 0 ? won2 : won1;
-        if (otherWon && !isAlreadyPlayed) saveResult(PUZZLE_DATE_ISO, 'win', MAX_PICKS - picksLeft);
-        if (pi === 0) setWon1(true); else setWon2(true);
+        // Preemptively set both accepted phrases so pool graying reflects the swapped arrangement,
+        // but only reveal/win the guessed slot — player still completes the other slot themselves
+        if (pi === 0) { setAccepted0(p2); setAccepted1(p1); }
+        else           { setAccepted1(p1); setAccepted0(p2); }
       }
+      const setRev = pi === 0 ? setRev1 : setRev2;
+      setRev(allIdx);
+      const otherWon = pi === 0 ? won2 : won1;
+      if (otherWon && !isAlreadyPlayed) saveResult(PUZZLE_DATE_ISO, 'win', MAX_PICKS - picksLeft);
+      if (pi === 0) setWon1(true); else setWon2(true);
     } else {
       const setErr = pi === 0 ? setErr1 : setErr2;
       setErr(true); setTimeout(() => setErr(false), 1000);
@@ -1074,7 +1068,7 @@ export default function App() {
       }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', maxWidth: 520 }}>
           {pool.map((ch, i) => {
-            const done = gaveUp || allInstancesRevealed(ch, p1, p2, rev1, rev2);
+            const done = gaveUp || allInstancesRevealed(ch, accepted0, accepted1, rev1, rev2);
             return (
               <div key={ch} data-pool-tile={i} draggable={!IS_TOUCH} {...poolTileTouch(ch, i)}
                 onDragStart={() => startDragFromPool(ch, i)} onDragEnd={handleDragEnd}
