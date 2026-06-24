@@ -902,12 +902,24 @@ export default function App() {
     const usedSwap = SPACES_MIRROR && picksLeft === MAX_PICKS && guess === altPhrase && guess !== phrase;
     const correct = guess === phrase || usedSwap;
     if (correct) {
-      if (usedSwap) { if (pi === 0) setAccepted0(p2); else setAccepted1(p1); }
-      const setRev = pi === 0 ? setRev1 : setRev2;
-      setRev(new Set(Array.from({ length: phrase.length }, (_, i) => i)));
-      const otherWon = pi === 0 ? won2 : won1;
-      if (otherWon && !isAlreadyPlayed) saveResult(PUZZLE_DATE_ISO, 'win', MAX_PICKS - picksLeft);
-      if (pi === 0) setWon1(true); else setWon2(true);
+      const allIdx = new Set(Array.from({ length: phrase.length }, (_, i) => i));
+      if (usedSwap) {
+        // Winning with swapped phrases — reveal both slots simultaneously
+        if (pi === 0) {
+          setAccepted0(p2); setRev1(allIdx); setWon1(true);
+          if (!won2) { setAccepted1(p1); setRev2(allIdx); setWon2(true); }
+        } else {
+          setAccepted1(p1); setRev2(allIdx); setWon2(true);
+          if (!won1) { setAccepted0(p2); setRev1(allIdx); setWon1(true); }
+        }
+        if (!isAlreadyPlayed) saveResult(PUZZLE_DATE_ISO, 'win', MAX_PICKS - picksLeft);
+      } else {
+        const setRev = pi === 0 ? setRev1 : setRev2;
+        setRev(allIdx);
+        const otherWon = pi === 0 ? won2 : won1;
+        if (otherWon && !isAlreadyPlayed) saveResult(PUZZLE_DATE_ISO, 'win', MAX_PICKS - picksLeft);
+        if (pi === 0) setWon1(true); else setWon2(true);
+      }
     } else {
       const setErr = pi === 0 ? setErr1 : setErr2;
       setErr(true); setTimeout(() => setErr(false), 1000);
