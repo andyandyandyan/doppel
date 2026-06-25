@@ -901,13 +901,15 @@ export default function App() {
   }
 
   function buildGuess(pi) {
-    const phrase = pi === 0 ? p1 : p2, rev = pi === 0 ? rev1 : rev2, typed = pi === 0 ? typed1 : typed2;
+    // Use accepted phrase as template so revealed chars match what's actually displayed
+    const phrase = pi === 0 ? accepted0 : accepted1, rev = pi === 0 ? rev1 : rev2, typed = pi === 0 ? typed1 : typed2;
     return phrase.split('').map((ch, i) => { if (rev.has(i)) return ch; const tent = tentative.get(`${pi}-${i}`); if (tent) return tent; return typed[i] || ''; }).join('');
   }
 
   function submitGuess(pi) {
-    const phrase = pi === 0 ? p1 : p2;
-    const altPhrase = pi === 0 ? p2 : p1;
+    // Use accepted phrases so after a swap the other slot accepts its new "correct" answer
+    const phrase = pi === 0 ? accepted0 : accepted1;
+    const altPhrase = pi === 0 ? accepted1 : accepted0;
     const guess = buildGuess(pi);
     const usedSwap = SPACES_MIRROR && picksLeft === MAX_PICKS && guess === altPhrase && guess !== phrase;
     const correct = guess === phrase || usedSwap;
@@ -916,8 +918,8 @@ export default function App() {
       if (usedSwap) {
         // Preemptively set both accepted phrases so pool graying reflects the swapped arrangement,
         // but only reveal/win the guessed slot — player still completes the other slot themselves
-        if (pi === 0) { setAccepted0(p2); setAccepted1(p1); }
-        else           { setAccepted1(p1); setAccepted0(p2); }
+        if (pi === 0) { setAccepted0(p2); if (!won2) setAccepted1(p1); }
+        else           { setAccepted1(p1); if (!won1) setAccepted0(p2); }
       }
       const setRev = pi === 0 ? setRev1 : setRev2;
       setRev(allIdx);
