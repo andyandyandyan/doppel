@@ -444,7 +444,7 @@ function StatsModal({ onClose }) {
   const losses = entries.filter(e => e.outcome === 'lose');
   const played = entries.length;
   const winPct = played ? Math.round(wins.length / played * 100) : 0;
-  const byReveals = [0, 1, 2, 3].map(n => wins.filter(e => e.reveals === n).length);
+  const byReveals = [0, 1, 2, 3, 4, 5].map(n => wins.filter(e => e.reveals === n).length);
   const row = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.45rem 0', borderBottom: '1px solid var(--border-dim)' };
   const lbl = { fontFamily: "'DM Mono',monospace", fontSize: '0.68rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--dim)' };
   const val = { fontFamily: "'DM Mono',monospace", fontSize: '1rem', fontWeight: 700, color: 'var(--accent)' };
@@ -459,6 +459,8 @@ function StatsModal({ onClose }) {
         <div style={row}><span style={lbl}>1 reveal</span><span style={val}>{byReveals[1]}</span></div>
         <div style={row}><span style={lbl}>2 reveals</span><span style={val}>{byReveals[2]}</span></div>
         <div style={row}><span style={lbl}>3 reveals</span><span style={val}>{byReveals[3]}</span></div>
+        <div style={row}><span style={lbl}>4 reveals</span><span style={val}>{byReveals[4]}</span></div>
+        <div style={row}><span style={lbl}>5 reveals</span><span style={val}>{byReveals[5]}</span></div>
         <div style={{ ...row, borderBottom: 'none' }}><span style={lbl}>Gave up</span><span style={val}>{losses.length}</span></div>
       </div>
     </div>
