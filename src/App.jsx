@@ -63,7 +63,7 @@ const RESULTS_KEY = 'doppel-results';
 function loadResults() { try { return JSON.parse(localStorage.getItem(RESULTS_KEY) || '{}'); } catch { return {}; } }
 const PROGRESS_KEY = 'doppel-progress';
 function clearProgress() { localStorage.removeItem(PROGRESS_KEY); }
-function saveResult(dateISO, outcome, reveals) { const r = loadResults(); r[dateISO] = { outcome, reveals }; localStorage.setItem(RESULTS_KEY, JSON.stringify(r)); clearProgress(); }
+function saveResult(dateISO, outcome, reveals) { const r = loadResults(); r[dateISO] = { outcome, reveals, ...(IS_ARCHIVE_MODE ? { archive: true } : {}) }; localStorage.setItem(RESULTS_KEY, JSON.stringify(r)); clearProgress(); }
 // Both phrases have spaces at identical indices → either answer is valid in either slot with no reveals used.
 const SPACES_MIRROR = !PUZZLE_ERROR && (() => { const { p1, p2 } = PUZZLE; for (let i = 0; i < p1.length; i++) if ((p1[i] === ' ') !== (p2[i] === ' ')) return false; return true; })();
 const PREV_RESULT = !PUZZLE_ERROR && !IS_ARCHIVE_MODE ? (loadResults()[PUZZLE_DATE_ISO] || null) : null;
@@ -76,7 +76,7 @@ function saveProgress(s) { localStorage.setItem(PROGRESS_KEY, JSON.stringify({ d
 const SAVED_PROGRESS = !PUZZLE_ERROR ? loadProgress() : null;
 function calcStreak(results) {
   const today = todayISO();
-  const winDates = Object.entries(results).filter(([, r]) => r.outcome === 'win').map(([d]) => d).sort().reverse();
+  const winDates = Object.entries(results).filter(([, r]) => r.outcome === 'win' && !r.archive).map(([d]) => d).sort().reverse();
   if (!winDates.length) return 0;
   const prev = new Date(parseLocalDate(today)); prev.setDate(prev.getDate() - 1);
   const yesterdayISO = `${prev.getFullYear()}-${String(prev.getMonth()+1).padStart(2,'0')}-${String(prev.getDate()).padStart(2,'0')}`;
