@@ -570,7 +570,7 @@ function ArchiveModal({ onClose }) {
 }
 
 // ─── Result modal ──────────────────────────────────────────────────────────────
-function ResultModal({ outcome, reveals, onClose, onArchive }) {
+function ResultModal({ outcome, reveals, streak, onClose, onArchive }) {
   const [copied, setCopied] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const win = outcome === 'win';
@@ -608,7 +608,12 @@ function ResultModal({ outcome, reveals, onClose, onArchive }) {
         <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.7rem', color: 'var(--dim)', marginBottom: '0.3rem' }}>
           {reveals === 0 ? 'You used no reveals' : `You used ${reveals} reveal${reveals === 1 ? '' : 's'}`}
         </div>
-        {dots && <div style={{ fontSize: '1rem', marginBottom: '0.6rem', letterSpacing: '0.1em' }}>{dots}</div>}
+        {dots && <div style={{ fontSize: '1rem', marginBottom: '0.5rem', letterSpacing: '0.1em' }}>{dots}</div>}
+        {win && !IS_ARCHIVE_MODE && streak > 0 && (
+          <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.78rem', fontWeight: 700, color: 'var(--accent)', marginBottom: '0.6rem' }}>
+            {streak} day streak 🔥
+          </div>
+        )}
 
         <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.62rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--dim)', marginBottom: '1.2rem' }}>
           {PUZZLE_DATE} · "{PUZZLE_CLUE}"
@@ -667,6 +672,8 @@ export default function App() {
   const [giveUpRev2, setGiveUpRev2] = useState(new Set());
   const [showResult, setShowResult] = useState(isAlreadyPlayed);
   const [showArchive, setShowArchive] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const streak = !IS_ARCHIVE_MODE ? calcStreak(loadResults()) : 0;
 
   // Help — skip for archive visits, already-finished puzzles, and mid-game refreshes
   const [showHelp, setShowHelp] = useState(() => !localStorage.getItem(HELP_KEY) && !IS_ARCHIVE_MODE && !isAlreadyPlayed && !sp);
@@ -1007,7 +1014,7 @@ export default function App() {
       <div style={{ textAlign: 'center', lineHeight: 1.3 }}>
         <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.65rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--dim)' }}>{PUZZLE_DATE}</div>
         <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '1.1rem', color: 'var(--text)', marginTop: '0.2rem' }}>"{PUZZLE_CLUE}"</div>
-        {(() => { const s = calcStreak(loadResults()); return !IS_ARCHIVE_MODE && s > 0 ? <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.62rem', letterSpacing: '0.08em', color: 'var(--dim)', marginTop: '0.35rem' }}>{s} day streak 🔥</div> : null; })()}
+        {streak > 0 && <button onClick={() => setShowStats(true)} style={{ marginTop: '0.4rem', fontFamily: "'DM Mono',monospace", fontSize: '0.62rem', letterSpacing: '0.08em', color: 'var(--dim)', background: 'none', border: '1px solid var(--border-dim)', borderRadius: 4, padding: '0.2rem 0.55rem', cursor: 'pointer' }}>{streak} day streak 🔥</button>}
       </div>
 
       {/* Phrase rows */}
@@ -1119,12 +1126,14 @@ export default function App() {
         <ResultModal
           outcome={gaveUp ? 'lose' : 'win'}
           reveals={MAX_PICKS - picksLeft}
+          streak={streak}
           onClose={() => setShowResult(false)}
           onArchive={() => { setShowResult(false); setShowArchive(true); }}
         />
       )}
 
       {showArchive && <ArchiveModal onClose={() => setShowArchive(false)} />}
+      {showStats && <StatsModal onClose={() => setShowStats(false)} />}
 
       {ghostPos && ghostChar && (
         <div style={{ position: 'fixed', left: ghostPos.x - 18, top: ghostPos.y - 21 - GHOST_LIFT, width: 36, height: 42, border: '1.5px solid var(--border)', borderRadius: 4, background: 'var(--tile-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'DM Mono',monospace", fontSize: '0.9rem', fontWeight: 500, color: 'var(--text)', pointerEvents: 'none', zIndex: 9999, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', opacity: 0.9, userSelect: 'none' }}>
