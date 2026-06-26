@@ -74,6 +74,19 @@ function loadProgress() {
 }
 function saveProgress(s) { localStorage.setItem(PROGRESS_KEY, JSON.stringify({ date: PUZZLE_DATE_ISO, ...s })); }
 const SAVED_PROGRESS = !PUZZLE_ERROR ? loadProgress() : null;
+function calcStreak(results) {
+  const today = todayISO();
+  const winDates = Object.entries(results).filter(([, r]) => r.outcome === 'win').map(([d]) => d).sort().reverse();
+  if (!winDates.length) return 0;
+  const prev = new Date(parseLocalDate(today)); prev.setDate(prev.getDate() - 1);
+  const yesterdayISO = `${prev.getFullYear()}-${String(prev.getMonth()+1).padStart(2,'0')}-${String(prev.getDate()).padStart(2,'0')}`;
+  if (winDates[0] !== today && winDates[0] !== yesterdayISO) return 0;
+  let streak = 0, cur = parseLocalDate(winDates[0]);
+  for (const d of winDates) {
+    if (parseLocalDate(d).getTime() === cur.getTime()) { streak++; cur.setDate(cur.getDate() - 1); } else break;
+  }
+  return streak;
+}
 
 // ─── Demo data for help screens ───────────────────────────────────────────────
 const DP1 = 'KEVIN BACON';
@@ -444,23 +457,26 @@ function StatsModal({ onClose }) {
   const losses = entries.filter(e => e.outcome === 'lose');
   const played = entries.length;
   const winPct = played ? Math.round(wins.length / played * 100) : 0;
+  const streak = calcStreak(results);
   const byReveals = [0, 1, 2, 3, 4, 5].map(n => wins.filter(e => e.reveals === n).length);
   const row = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.45rem 0', borderBottom: '1px solid var(--border-dim)' };
   const lbl = { fontFamily: "'DM Mono',monospace", fontSize: '0.68rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--dim)' };
   const val = { fontFamily: "'DM Mono',monospace", fontSize: '1rem', fontWeight: 700, color: 'var(--accent)' };
+  const emojiLbl = { fontFamily: "'DM Mono',monospace", fontSize: '0.9rem', letterSpacing: '0.04em' };
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem' }} onClick={onClose}>
       <div style={{ position: 'relative', background: 'var(--bg)', borderRadius: 10, maxWidth: 320, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', padding: '1.8rem 1.6rem' }} onClick={e => e.stopPropagation()}>
         <button onClick={onClose} style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--dim)', fontSize: '1.2rem', lineHeight: 1, padding: 0 }}>×</button>
         <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '1.3rem', color: 'var(--accent)', marginBottom: '1.2rem' }}>My Stats</div>
         <div style={row}><span style={lbl}>Played</span><span style={val}>{played}</span></div>
-        <div style={{ ...row, marginBottom: '0.6rem' }}><span style={lbl}>Win %</span><span style={val}>{winPct}</span></div>
-        <div style={row}><span style={lbl}>Perfect (no reveals)</span><span style={val}>{byReveals[0]}</span></div>
-        <div style={row}><span style={lbl}>1 reveal</span><span style={val}>{byReveals[1]}</span></div>
-        <div style={row}><span style={lbl}>2 reveals</span><span style={val}>{byReveals[2]}</span></div>
-        <div style={row}><span style={lbl}>3 reveals</span><span style={val}>{byReveals[3]}</span></div>
-        <div style={row}><span style={lbl}>4 reveals</span><span style={val}>{byReveals[4]}</span></div>
-        <div style={row}><span style={lbl}>5 reveals</span><span style={val}>{byReveals[5]}</span></div>
+        <div style={row}><span style={lbl}>Win %</span><span style={val}>{winPct}</span></div>
+        <div style={{ ...row, marginBottom: '0.6rem' }}><span style={lbl}>Streak</span><span style={val}>{streak} 🔥</span></div>
+        <div style={row}><span style={lbl}>Perfect</span><span style={val}>{byReveals[0]}</span></div>
+        <div style={row}><span style={emojiLbl}>🔵</span><span style={val}>{byReveals[1]}</span></div>
+        <div style={row}><span style={emojiLbl}>🔵🔵</span><span style={val}>{byReveals[2]}</span></div>
+        <div style={row}><span style={emojiLbl}>🔵🔵🔵</span><span style={val}>{byReveals[3]}</span></div>
+        <div style={row}><span style={emojiLbl}>🔵🔵🔵🔵</span><span style={val}>{byReveals[4]}</span></div>
+        <div style={row}><span style={emojiLbl}>🔵🔵🔵🔵🔵</span><span style={val}>{byReveals[5]}</span></div>
         <div style={{ ...row, borderBottom: 'none' }}><span style={lbl}>Gave up</span><span style={val}>{losses.length}</span></div>
       </div>
     </div>
@@ -991,6 +1007,7 @@ export default function App() {
       <div style={{ textAlign: 'center', lineHeight: 1.3 }}>
         <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.65rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--dim)' }}>{PUZZLE_DATE}</div>
         <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '1.1rem', color: 'var(--text)', marginTop: '0.2rem' }}>"{PUZZLE_CLUE}"</div>
+        {(() => { const s = calcStreak(loadResults()); return !IS_ARCHIVE_MODE && s > 0 ? <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.62rem', letterSpacing: '0.08em', color: 'var(--dim)', marginTop: '0.35rem' }}>{s} day streak 🔥</div> : null; })()}
       </div>
 
       {/* Phrase rows */}
