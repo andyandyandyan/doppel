@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import puzzleSchedule from '../puzzle.json';
 
 // ─── Puzzle schedule ────────────────────────────────────────────────────────
@@ -1213,6 +1214,7 @@ export default function App() {
         </div>
       )}
 
+      <Analytics />
     </div>
   );
 }
