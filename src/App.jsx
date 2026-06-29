@@ -999,11 +999,21 @@ export default function App() {
     <div style={{ minHeight: '100dvh', background: 'var(--bg)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '2.5rem 1.5rem', gap: '1.8rem' }}>
 
       {/* Title + help button */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '2.4rem', fontWeight: 900, color: 'var(--accent)', letterSpacing: '-0.01em', lineHeight: 1 }}>
-          doppel
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '2.4rem', fontWeight: 900, color: 'var(--accent)', letterSpacing: '-0.01em', lineHeight: 1 }}>
+            doppel
+          </div>
+          <button onClick={openHelp} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '50%', width: 18, height: 18, cursor: 'pointer', fontSize: '0.55rem', color: 'var(--dim)', fontFamily: "'DM Mono',monospace", display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0, marginTop: 6 }}>?</button>
         </div>
-        <button onClick={openHelp} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '50%', width: 18, height: 18, cursor: 'pointer', fontSize: '0.55rem', color: 'var(--dim)', fontFamily: "'DM Mono',monospace", display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0, marginTop: 6 }}>?</button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {['My Stats', 'Archive'].map((label, i) => (
+            <button key={label} onClick={() => i === 0 ? setShowStats(true) : setShowArchive(true)}
+              style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 5, padding: '0.22rem 0.65rem', fontFamily: "'DM Mono',monospace", fontSize: '0.58rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--dim)', cursor: 'pointer' }}>
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {IS_ARCHIVE_MODE && (
