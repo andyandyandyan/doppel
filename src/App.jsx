@@ -460,10 +460,26 @@ function StatsModal({ onClose }) {
   const winPct = played ? Math.round(wins.length / played * 100) : 0;
   const streak = calcStreak(results);
   const byReveals = [0, 1, 2, 3, 4, 5].map(n => wins.filter(e => e.reveals === n).length);
+  const maxCount = Math.max(...byReveals, losses.length, 1);
+
   const row = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.45rem 0', borderBottom: '1px solid var(--border-dim)' };
   const lbl = { fontFamily: "'DM Mono',monospace", fontSize: '0.68rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--dim)' };
   const val = { fontFamily: "'DM Mono',monospace", fontSize: '1rem', fontWeight: 700, color: 'var(--accent)' };
-  const emojiLbl = { fontFamily: "'DM Mono',monospace", fontSize: '0.9rem', letterSpacing: '0.04em' };
+
+  const histLabels = ['Perfect', '🔵', '🔵🔵', '🔵🔵🔵', '🔵🔵🔵🔵', '🔵🔵🔵🔵🔵'];
+  const isEmoji = l => l !== 'Perfect' && l !== 'Gave up';
+
+  const HistRow = ({ label, count, last, loss }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.28rem 0', borderBottom: last ? 'none' : '1px solid var(--border-dim)' }}>
+      <span style={{ fontFamily: "'DM Mono',monospace", fontSize: isEmoji(label) ? '0.85rem' : '0.68rem', letterSpacing: isEmoji(label) ? '0.04em' : '0.08em', textTransform: 'uppercase', color: 'var(--dim)', width: 80, flexShrink: 0 }}>{label}</span>
+      <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+        <div style={{ width: `${(count / maxCount) * 100}%`, minWidth: count > 0 ? 24 : 2, height: 20, background: loss ? 'var(--dim)' : 'var(--accent)', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: count > 0 ? 5 : 0 }}>
+          {count > 0 && <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.62rem', fontWeight: 700, color: '#fff' }}>{count}</span>}
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem' }} onClick={onClose}>
       <div style={{ position: 'relative', background: 'var(--bg)', borderRadius: 10, maxWidth: 320, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', padding: '1.8rem 1.6rem' }} onClick={e => e.stopPropagation()}>
@@ -472,13 +488,8 @@ function StatsModal({ onClose }) {
         <div style={row}><span style={lbl}>Played</span><span style={val}>{played}</span></div>
         <div style={row}><span style={lbl}>Win %</span><span style={val}>{winPct}</span></div>
         <div style={{ ...row, marginBottom: '0.6rem' }}><span style={lbl}>Streak</span><span style={val}>{streak} 🔥</span></div>
-        <div style={row}><span style={lbl}>Perfect</span><span style={val}>{byReveals[0]}</span></div>
-        <div style={row}><span style={emojiLbl}>🔵</span><span style={val}>{byReveals[1]}</span></div>
-        <div style={row}><span style={emojiLbl}>🔵🔵</span><span style={val}>{byReveals[2]}</span></div>
-        <div style={row}><span style={emojiLbl}>🔵🔵🔵</span><span style={val}>{byReveals[3]}</span></div>
-        <div style={row}><span style={emojiLbl}>🔵🔵🔵🔵</span><span style={val}>{byReveals[4]}</span></div>
-        <div style={row}><span style={emojiLbl}>🔵🔵🔵🔵🔵</span><span style={val}>{byReveals[5]}</span></div>
-        <div style={{ ...row, borderBottom: 'none' }}><span style={lbl}>Gave up</span><span style={val}>{losses.length}</span></div>
+        {histLabels.map((label, i) => <HistRow key={label} label={label} count={byReveals[i]} />)}
+        <HistRow label="Gave up" count={losses.length} loss last />
       </div>
     </div>
   );
