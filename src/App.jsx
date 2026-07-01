@@ -8,13 +8,18 @@ import puzzleSchedule from '../puzzle.json';
 // earlier (in the visitor's local time) is the one that plays. Add as many
 // future entries as you like; nothing else needs to change day to day.
 function todayISO() {
+  const now = new Date();
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
     year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', hourCycle: 'h23',
-  }).formatToParts(new Date());
+  }).formatToParts(now);
   const get = t => parseInt(parts.find(p => p.type === t).value);
-  let [y, mo, d, h] = [get('year'), get('month'), get('day'), get('hour')];
+  let [y, mo, d] = [get('year'), get('month'), get('day')];
+  // Use hour12: false instead of hourCycle:'h23' — broader Safari support
+  let h = parseInt(new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York', hour: 'numeric', hour12: false,
+  }).format(now), 10);
+  if (h === 24) h = 0; // some engines return 24 at midnight instead of 0
   if (h < 3) {
     const prev = new Date(y, mo - 1, d - 1);
     [y, mo, d] = [prev.getFullYear(), prev.getMonth() + 1, prev.getDate()];
