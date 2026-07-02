@@ -109,15 +109,15 @@
 },
   {
     "date": "2026-07-03",
-    "title": "in the oval office, in our dreams",
-    "phrase1": "JOSIAH BARTLET",
-    "phrase2": "DWAYNE CAMACHO"
-},
-  {
-    "date": "2026-07-04",
     "title": "we are so back",
     "phrase1": "THE FUTURE IS BRIGHT",
     "phrase2": "WEVE TURNED A CORNER"
+},
+  {
+    "date": "2026-07-04",
+    "title": "in the oval office, in our dreams",
+    "phrase1": "JOSIAH BARTLET",
+    "phrase2": "DWAYNE CAMACHO"
 },
   {
     "date": "2026-07-05",
@@ -142,5 +142,11 @@
     "title": "this is the start of something big",
     "phrase1": "IN THE BEGINNING",
     "phrase2": "ONCE UPON A TIME"
+},
+  {
+    "date": "2026-07-09",
+    "title": "tu-dum",
+    "phrase1": "HOUSE OF CARDS",
+    "phrase2": "EMILY IN PARIS"
 }
 ]
