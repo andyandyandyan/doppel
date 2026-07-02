@@ -620,6 +620,8 @@ function ResultModal({ outcome, reveals, streak, onClose, onArchive }) {
       <div style={{ position: 'relative', background: 'var(--bg)', borderRadius: 10, maxWidth: 340, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', padding: '1.8rem 1.6rem', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
         <button onClick={onClose} style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--dim)', fontSize: '1.2rem', lineHeight: 1, padding: 0 }}>×</button>
 
+        {win && reveals === 0 && <div style={{ fontSize: '2.2rem', marginBottom: '0.2rem' }}>😎</div>}
+        {!win && <div style={{ fontSize: '2.2rem', marginBottom: '0.2rem' }}>🔴</div>}
         <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '1.6rem', color: 'var(--accent)', marginBottom: '0.6rem' }}>{heading}</div>
 
         <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.7rem', color: 'var(--dim)', marginBottom: '0.3rem' }}>
