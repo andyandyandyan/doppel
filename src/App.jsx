@@ -471,19 +471,21 @@ function StatsModal({ onClose }) {
   const lbl = { fontFamily: "'DM Mono',monospace", fontSize: '0.68rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--dim)' };
   const val = { fontFamily: "'DM Mono',monospace", fontSize: '1rem', fontWeight: 700, color: 'var(--accent)' };
 
-  const histLabels = ['Perfect', '🔵', '🔵🔵', '🔵🔵🔵', '🔵🔵🔵🔵', '🔵🔵🔵🔵🔵'];
-  const isEmoji = l => l !== 'Perfect' && l !== 'Gave up';
+  const histLabels = ['🦄', '🔵', '🔵🔵', '🔵🔵🔵', '🔵🔵🔵🔵', '🔵🔵🔵🔵🔵'];
 
-  const HistRow = ({ label, count, last, loss }) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.28rem 0', borderBottom: last ? 'none' : '1px solid var(--border-dim)' }}>
-      <span style={{ fontFamily: "'DM Mono',monospace", fontSize: isEmoji(label) ? '0.85rem' : '0.68rem', letterSpacing: isEmoji(label) ? '0.04em' : '0.08em', textTransform: 'uppercase', color: 'var(--dim)', width: 80, flexShrink: 0 }}>{label}</span>
-      <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
-        <div style={{ width: `${(count / maxCount) * 100}%`, minWidth: count > 0 ? 24 : 2, height: 20, background: loss ? 'var(--dim)' : 'var(--accent)', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: count > 0 ? 5 : 0 }}>
-          {count > 0 && <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.62rem', fontWeight: 700, color: '#fff' }}>{count}</span>}
+  const HistRow = ({ label, count, last, loss }) => {
+    const isText = label === 'Gave up';
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.28rem 0', borderBottom: last ? 'none' : '1px solid var(--border-dim)' }}>
+        <span style={{ fontFamily: "'DM Mono',monospace", fontSize: isText ? '0.68rem' : '0.85rem', letterSpacing: isText ? '0.08em' : '0.04em', textTransform: 'uppercase', color: 'var(--dim)', flexBasis: 96, flexShrink: 0, flexGrow: 0, overflow: 'hidden' }}>{label}</span>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'flex-end' }}>
+          <div style={{ width: `${(count / maxCount) * 100}%`, minWidth: count > 0 ? 24 : 2, height: 20, background: loss ? 'var(--dim)' : 'var(--accent)', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: count > 0 ? 5 : 0 }}>
+            {count > 0 && <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.62rem', fontWeight: 700, color: '#fff' }}>{count}</span>}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem' }} onClick={onClose}>
