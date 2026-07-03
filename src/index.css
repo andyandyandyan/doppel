@@ -2,6 +2,15 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+@keyframes phrase-shake {
+  0%,100% { transform: translateX(0); }
+  20%     { transform: translateX(-7px); }
+  40%     { transform: translateX(7px); }
+  60%     { transform: translateX(-4px); }
+  80%     { transform: translateX(4px); }
+}
+.phrase-shake { animation: phrase-shake 0.4s ease; }
+
 :root {
   --bg:         #f4f3ef;
   --text:       #1c1b18;

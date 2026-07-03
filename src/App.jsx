@@ -408,7 +408,7 @@ const HELP_TEXT = [
   'This is a doppel.',
   'A doppel is a pair of phrases that have three things in common: character length, at least one letter in the same position, and a theme.',
   "In this game, only the doppel's key characteristics — its length, common letters in identical spots, and clue — are visible. You must guess the rest.",
-  'To do that, you have access to all the letters that appear in either word. Double click to reveal their places, but choose wisely: you only get three. The fewer you use, the more impressive your achievement.',
+  'To do that, you have access to all the letters that appear in either word. Double click to reveal their places, but choose wisely: you only get five. The fewer you use, the more impressive your achievement.',
   'Correctly guess the doppel to win.',
 ];
 const HELP_COMPS = [HelpScreen1, HelpScreen2, HelpScreen3, HelpScreen4, HelpScreen5];
@@ -496,7 +496,7 @@ function StatsModal({ onClose }) {
         <div style={row}><span style={lbl}>Win %</span><span style={val}>{winPct}</span></div>
         <div style={{ ...row, marginBottom: '0.6rem' }}><span style={lbl}>Streak</span><span style={val}>{streak} 🔥</span></div>
         {histLabels.map((label, i) => <HistRow key={label} label={label} count={byReveals[i]} />)}
-        <HistRow label="Gave up" count={losses.length} loss last />
+        <HistRow label="🔴" count={losses.length} loss last />
       </div>
     </div>
   );
@@ -1056,7 +1056,7 @@ export default function App() {
           const won = pi === 0 ? won1 : won2, err = pi === 0 ? err1 : err2;
           const focused = pi === 0 ? focus1 : focus2, lines = pi === 0 ? LINES1 : LINES2;
           return (
-            <div key={pi} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div key={pi} className={err ? 'phrase-shake' : undefined} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {lines.map((line, lineIdx) => {
                 const isFirst = lineIdx === 0;
                 return (
