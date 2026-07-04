@@ -531,9 +531,20 @@ function ArchiveModal({ onClose }) {
 
   const navBtn = { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontFamily: "'DM Mono',monospace", fontSize: '1.1rem', padding: '0.2rem 0.6rem', lineHeight: 1 };
 
+  const swipeStartX = useRef(null);
+  function onTouchStart(e) { swipeStartX.current = e.touches[0].clientX; }
+  function onTouchEnd(e) {
+    if (swipeStartX.current === null) return;
+    const dx = e.changedTouches[0].clientX - swipeStartX.current;
+    swipeStartX.current = null;
+    if (Math.abs(dx) < 40) return;
+    if (dx < 0 && canFwd)  goForward();
+    if (dx > 0 && canBack) goBack();
+  }
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }} onClick={onClose}>
-      <div style={{ position: 'relative', background: 'var(--bg)', borderRadius: 10, maxWidth: 340, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', padding: '1.4rem 1.6rem 1.6rem' }} onClick={e => e.stopPropagation()}>
+      <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ position: 'relative', background: 'var(--bg)', borderRadius: 10, maxWidth: 340, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', padding: '1.4rem 1.6rem 1.6rem' }} onClick={e => e.stopPropagation()}>
         <button onClick={onClose} style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--dim)', fontSize: '1.2rem', lineHeight: 1, padding: 0 }}>×</button>
 
         <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '1.3rem', color: 'var(--accent)', marginBottom: '1rem' }}>Past puzzles</div>
