@@ -512,87 +512,140 @@ function ArchiveModal({ onClose }) {
   const [viewYear,  setViewYear]  = useState(seed.getFullYear());
   const [viewMonth, setViewMonth] = useState(seed.getMonth());
 
+  function shiftMonth(y, m, d) {
+    let nm = m + d, ny = y;
+    if (nm < 0)  { nm = 11; ny -= 1; }
+    if (nm > 11) { nm = 0;  ny += 1; }
+    return { year: ny, month: nm };
+  }
+
   const earliest = ARCHIVE_ENTRIES.length > 0 ? parseLocalDate(ARCHIVE_ENTRIES[ARCHIVE_ENTRIES.length - 1].date) : seed;
   const today    = parseLocalDate(todayISO());
   const canBack  = viewYear > earliest.getFullYear() || (viewYear === earliest.getFullYear() && viewMonth > earliest.getMonth());
   const canFwd   = viewYear < today.getFullYear()    || (viewYear === today.getFullYear()    && viewMonth < today.getMonth());
 
-  function goBack()    { if (viewMonth === 0)  { setViewYear(y => y - 1); setViewMonth(11); } else setViewMonth(m => m - 1); }
-  function goForward() { if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0);  } else setViewMonth(m => m + 1); }
+  // Sliding strip: index 0=prev, 1=current(default), 2=next
+  const [stripIdx,  setStripIdx]  = useState(1);
+  const [dragDelta, setDragDelta] = useState(0);
+  const [sliding,   setSliding]   = useState(false); // true = transition on
+  const navigating  = useRef(false);
+  const touchStartX = useRef(null);
 
-  const firstOfMonth = new Date(viewYear, viewMonth, 1);
-  const daysInMonth  = new Date(viewYear, viewMonth + 1, 0).getDate();
-  const startDow     = firstOfMonth.getDay(); // 0 = Sun
-  const monthLabel   = firstOfMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  function commitNav(targetIdx, updateFn) {
+    if (navigating.current) return;
+    navigating.current = true;
+    setSliding(true);
+    setStripIdx(targetIdx);
+    setDragDelta(0);
+    setTimeout(() => {
+      setSliding(false);
+      updateFn();
+      setStripIdx(1);
+      setDragDelta(0);
+      requestAnimationFrame(() => requestAnimationFrame(() => { navigating.current = false; }));
+    }, 320);
+  }
 
-  // Build cell array: nulls for leading blanks, then day numbers
-  const cells = [...Array(startDow).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
-  while (cells.length % 7 !== 0) cells.push(null); // complete last row
+  function goBack()    { if (!canBack) return; const p = shiftMonth(viewYear, viewMonth, -1); commitNav(0, () => { setViewYear(p.year); setViewMonth(p.month); }); }
+  function goForward() { if (!canFwd)  return; const f = shiftMonth(viewYear, viewMonth, +1); commitNav(2, () => { setViewYear(f.year); setViewMonth(f.month); }); }
+
+  function onTouchStart(e) {
+    if (navigating.current) return;
+    touchStartX.current = e.touches[0].clientX;
+    setSliding(false);
+  }
+  function onTouchMove(e) {
+    if (touchStartX.current === null || navigating.current) return;
+    let dx = e.touches[0].clientX - touchStartX.current;
+    if (dx < 0 && !canFwd)  dx = Math.max(dx * 0.15, -24);
+    if (dx > 0 && !canBack) dx = Math.min(dx * 0.15,  24);
+    setDragDelta(dx);
+  }
+  function onTouchEnd(e) {
+    if (touchStartX.current === null || navigating.current) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    touchStartX.current = null;
+    if (dx < -40 && canFwd)  { goForward(); return; }
+    if (dx > 40  && canBack) { goBack();    return; }
+    setSliding(true);
+    setDragDelta(0);
+  }
 
   const navBtn = { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontFamily: "'DM Mono',monospace", fontSize: '1.1rem', padding: '0.2rem 0.6rem', lineHeight: 1 };
 
-  const swipeStartX = useRef(null);
-  function onTouchStart(e) { swipeStartX.current = e.touches[0].clientX; }
-  function onTouchEnd(e) {
-    if (swipeStartX.current === null) return;
-    const dx = e.changedTouches[0].clientX - swipeStartX.current;
-    swipeStartX.current = null;
-    if (Math.abs(dx) < 40) return;
-    if (dx < 0 && canFwd)  goForward();
-    if (dx > 0 && canBack) goBack();
+  function renderSlide(year, month) {
+    const label = new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const startDow    = new Date(year, month, 1).getDay();
+    const cells = [...Array(startDow).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+    while (cells.length < 42) cells.push(null); // always 6 rows for consistent height
+
+    return (
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.7rem' }}>
+          <button onClick={goBack}    disabled={!canBack} style={{ ...navBtn, opacity: canBack ? 1 : 0.25 }}>←</button>
+          <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.7rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text)' }}>{label}</span>
+          <button onClick={goForward} disabled={!canFwd}  style={{ ...navBtn, opacity: canFwd  ? 1 : 0.25 }}>→</button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: '0.25rem' }}>
+          {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => (
+            <div key={d} style={{ textAlign: 'center', fontFamily: "'DM Mono',monospace", fontSize: '0.55rem', letterSpacing: '0.06em', color: 'var(--dim)', paddingBottom: '0.2rem' }}>{d}</div>
+          ))}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
+          {cells.map((day, ci) => {
+            if (!day) return <div key={ci} />;
+            const dateISO = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const puzzle  = puzzleByDate[dateISO];
+            const res     = puzzle ? results[dateISO] : null;
+            if (!puzzle) return (
+              <div key={ci} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 34, fontFamily: "'DM Mono',monospace", fontSize: '0.72rem', color: 'var(--border)', borderRadius: 5 }}>{day}</div>
+            );
+            const won = res?.outcome === 'win';
+            const indicator = !res ? null : won ? (res.reveals === 0 ? '★' : '●'.repeat(res.reveals)) : '✗';
+            return (
+              <a key={ci} href={`?date=${dateISO}`} title={`"${puzzle.title}"`}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 34, borderRadius: 5, textDecoration: 'none', cursor: 'pointer', background: res ? 'rgba(74,143,168,0.13)' : 'rgba(74,143,168,0.07)', border: `1px solid ${res ? 'rgba(74,143,168,0.35)' : 'rgba(74,143,168,0.18)'}`, gap: 1 }}>
+                <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', fontWeight: 500, color: 'var(--accent)', lineHeight: 1 }}>{day}</span>
+                {indicator && <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.5rem', color: won ? 'var(--accent)' : 'var(--dim)', lineHeight: 1, letterSpacing: '0.03em' }}>{indicator}</span>}
+              </a>
+            );
+          })}
+        </div>
+      </div>
+    );
   }
+
+  const prev = shiftMonth(viewYear, viewMonth, -1);
+  const next = shiftMonth(viewYear, viewMonth, +1);
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }} onClick={onClose}>
-      <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ position: 'relative', background: 'var(--bg)', borderRadius: 10, maxWidth: 340, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', padding: '1.4rem 1.6rem 1.6rem' }} onClick={e => e.stopPropagation()}>
-        <button onClick={onClose} style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--dim)', fontSize: '1.2rem', lineHeight: 1, padding: 0 }}>×</button>
-
+      <div
+        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+        style={{ position: 'relative', background: 'var(--bg)', borderRadius: 10, maxWidth: 340, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', padding: '1.4rem 1.6rem 1.6rem', overflow: 'hidden' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <button onClick={onClose} style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--dim)', fontSize: '1.2rem', lineHeight: 1, padding: 0, zIndex: 1 }}>×</button>
         <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '1.3rem', color: 'var(--accent)', marginBottom: '1rem' }}>Past puzzles</div>
 
         {ARCHIVE_ENTRIES.length === 0
           ? <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', color: 'var(--dim)', textAlign: 'center', padding: '1rem 0' }}>No past puzzles yet.</div>
-          : <>
-              {/* Month nav */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.7rem' }}>
-                <button onClick={goBack}    disabled={!canBack} style={{ ...navBtn, opacity: canBack ? 1 : 0.25 }}>←</button>
-                <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.7rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text)' }}>{monthLabel}</span>
-                <button onClick={goForward} disabled={!canFwd}  style={{ ...navBtn, opacity: canFwd  ? 1 : 0.25 }}>→</button>
-              </div>
-
-              {/* Day-of-week headers */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: '0.25rem' }}>
-                {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => (
-                  <div key={d} style={{ textAlign: 'center', fontFamily: "'DM Mono',monospace", fontSize: '0.55rem', letterSpacing: '0.06em', color: 'var(--dim)', paddingBottom: '0.2rem' }}>{d}</div>
+          : <div style={{ overflow: 'hidden' }}>
+              <div style={{
+                display: 'flex',
+                width: '300%',
+                transform: `translateX(calc(${-stripIdx * 100 / 3}% + ${dragDelta}px))`,
+                transition: sliding ? 'transform 0.32s cubic-bezier(0.25,0.46,0.45,0.94)' : 'none',
+                willChange: 'transform',
+              }}>
+                {[prev, { year: viewYear, month: viewMonth }, next].map((m, i) => (
+                  <div key={i} style={{ width: `${100 / 3}%`, flexShrink: 0 }}>
+                    {renderSlide(m.year, m.month)}
+                  </div>
                 ))}
               </div>
-
-              {/* Calendar grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
-                {cells.map((day, ci) => {
-                  if (!day) return <div key={ci} />;
-                  const dateISO = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                  const puzzle  = puzzleByDate[dateISO];
-                  const res     = puzzle ? results[dateISO] : null;
-
-                  if (!puzzle) return (
-                    <div key={ci} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 38, fontFamily: "'DM Mono',monospace", fontSize: '0.72rem', color: 'var(--border)', borderRadius: 5 }}>
-                      {day}
-                    </div>
-                  );
-
-                  const won       = res?.outcome === 'win';
-                  const indicator = !res ? null : won ? (res.reveals === 0 ? '★' : '●'.repeat(res.reveals)) : '✗';
-
-                  return (
-                    <a key={ci} href={`?date=${dateISO}`} title={`"${puzzle.title}"`}
-                      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 38, borderRadius: 5, textDecoration: 'none', cursor: 'pointer', background: res ? 'rgba(74,143,168,0.13)' : 'rgba(74,143,168,0.07)', border: `1px solid ${res ? 'rgba(74,143,168,0.35)' : 'rgba(74,143,168,0.18)'}`, gap: 1 }}>
-                      <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', fontWeight: 500, color: 'var(--accent)', lineHeight: 1 }}>{day}</span>
-                      {indicator && <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.5rem', color: won ? 'var(--accent)' : 'var(--dim)', lineHeight: 1, letterSpacing: '0.03em' }}>{indicator}</span>}
-                    </a>
-                  );
-                })}
-              </div>
-            </>
+            </div>
         }
       </div>
     </div>
