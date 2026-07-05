@@ -127,27 +127,27 @@
 },
   {
     "date": "2026-07-06",
-    "title": "'touch 'em all'",
-    "phrase1": "BACK BACK BACK GONE",
-    "phrase2": "HE CRUSHED THAT ONE"
-},
-  {
-    "date": "2026-07-07",
-    "title": "bestselling consoles",
-    "phrase1": "PLAYSTATION TWO",
-    "phrase2": "NINTENDO SWITCH"
-},
-  {
-    "date": "2026-07-08",
     "title": "this is the start of something big",
     "phrase1": "IN THE BEGINNING",
     "phrase2": "ONCE UPON A TIME"
 },
   {
-    "date": "2026-07-09",
+    "date": "2026-07-07",
     "title": "tu-dum",
     "phrase1": "HOUSE OF CARDS",
     "phrase2": "EMILY IN PARIS"
+},
+  {
+    "date": "2026-07-08",
+    "title": "'touch 'em all'",
+    "phrase1": "BACK BACK BACK GONE",
+    "phrase2": "HE CRUSHED THAT ONE"
+},
+  {
+    "date": "2026-07-09",
+    "title": "bestselling consoles",
+    "phrase1": "PLAYSTATION TWO",
+    "phrase2": "NINTENDO SWITCH"
 },
   {
     "date": "2026-07-10",
