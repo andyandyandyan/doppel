@@ -57,13 +57,6 @@ if (!PUZZLE_ERROR) {
 }
 const MAX_PICKS = 5;
 const HELP_KEY = 'doppel-help-seen';
-const GHOST_LIFT = 56; // lift the dragged tile above a finger on touch devices
-// Some mobile browsers (notably Android Chrome) will start a *native* HTML5 drag
-// from a `draggable` element on touch-and-hold, racing our own touch handlers and
-// drawing the OS's own drag image (which ignores GHOST_LIFT and drops at the raw
-// finger position). Disable the `draggable` attribute on touch devices so only our
-// custom touch logic ever drives a drag there; mouse/desktop keeps native DnD.
-const IS_TOUCH = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
 const RESULTS_KEY = 'doppel-results';
 function loadResults() { try { return JSON.parse(localStorage.getItem(RESULTS_KEY) || '{}'); } catch { return {}; } }
@@ -733,9 +726,7 @@ export default function App() {
     if (sp) return new Set(sp.rev2);
     const s = new Set(COMMON); for (let i = 0; i < p2.length; i++) if (p2[i] === ' ') s.add(i); return s;
   });
-  const [tentative, setTent]  = useState(() => sp ? new Map(sp.tentative) : new Map());
   const [picksLeft, setPicks] = useState(isAlreadyPlayed ? MAX_PICKS - PREV_RESULT.reveals : (sp?.picksLeft ?? MAX_PICKS));
-  const [dragging,  setDrag]  = useState(null);
   const [typed1,    setTyped1] = useState(() => sp?.typed1 ?? {});
   const [typed2,    setTyped2] = useState(() => sp?.typed2 ?? {});
   const [focus1,    setFocus1] = useState(null);
@@ -749,9 +740,6 @@ export default function App() {
   const [err1,      setErr1]  = useState(false);
   const [err2,      setErr2]  = useState(false);
   const [pendingTile, setPendingTile] = useState(null);
-  const [touchDragSlot, setTouchDragSlot] = useState(null);
-  const [ghostPos,  setGhostPos]  = useState(null);
-  const [ghostChar, setGhostChar] = useState(null);
   const [gaveUp,    setGaveUp]   = useState(isAlreadyPlayed && PREV_RESULT.outcome === 'lose');
   const [giveUpRev1, setGiveUpRev1] = useState(new Set());
   const [giveUpRev2, setGiveUpRev2] = useState(new Set());
@@ -772,19 +760,11 @@ export default function App() {
   const helpDragX  = useRef(null);
   const helpDragDX = useRef(0);
 
-  const dragSrc     = useRef(null);
-  const poolDragIdx = useRef(null);
   const slotRefs    = useRef({});
-  const touchStateRef = useRef({ startPos: null, isDragging: false, source: null });
 
   const LINES1 = wrapPhrase(p1);
   const LINES2 = wrapPhrase(p2);
 
-  useEffect(() => {
-    const prevent = e => { if (touchStateRef.current.isDragging) e.preventDefault(); };
-    document.addEventListener('touchmove', prevent, { passive: false });
-    return () => document.removeEventListener('touchmove', prevent);
-  }, []);
 
   // Measure card width whenever help opens
   useEffect(() => {
@@ -802,12 +782,11 @@ export default function App() {
     if ((won1 && won2) || gaveUp) { clearProgress(); return; }
     saveProgress({
       rev1: [...rev1], rev2: [...rev2],
-      tentative: [...tentative],
       typed1, typed2,
       picksLeft, won1, won2,
       pool, accepted0, accepted1,
     });
-  }, [rev1, rev2, tentative, typed1, typed2, picksLeft, won1, won2, gaveUp, pool, accepted0, accepted1]);
+  }, [rev1, rev2, typed1, typed2, picksLeft, won1, won2, gaveUp, pool, accepted0, accepted1]);
 
   function handleGiveUp() {
     setGaveUp(true);
@@ -856,109 +835,6 @@ export default function App() {
     else if (dx > 60 && helpPage > 0) setHelpPage(p => p - 1);
   }
 
-  // ── Drag handlers ────────────────────────────────────────────────────────
-  function startDragFromPool(ch, idx) { poolDragIdx.current = idx; dragSrc.current = null; setDrag(ch); }
-  function startDragFromSlot(pi, idx, ch) {
-    dragSrc.current = { pi, idx, ch };
-    // Do NOT remove from tentative here — removing the DOM node during dragstart causes
-    // browsers to fire dragend immediately, killing the drag before drop can register.
-    // Instead, hide it visually and remove it only on a confirmed drop.
-    setTouchDragSlot({ pi, idx });
-    setDrag(ch);
-  }
-  function handleDragEnd() { poolDragIdx.current = null; dragSrc.current = null; setTouchDragSlot(null); setDrag(null); }
-
-  function startTouchDrag(source, ch, x, y) {
-    touchStateRef.current.isDragging = true;
-    touchStateRef.current.source = source;
-    setGhostPos({ x, y }); setGhostChar(ch); setDrag(ch);
-    if (source.type === 'pool') { poolDragIdx.current = source.poolIdx; }
-    else { setTouchDragSlot({ pi: source.pi, idx: source.idx }); }
-  }
-
-  function handleTouchDrop(x, y) {
-    const { source } = touchStateRef.current;
-    if (!source) return;
-    // Hit-test where the tile is actually drawn (lifted above the finger), not the raw touch point.
-    const el = document.elementFromPoint(x, y - GHOST_LIFT);
-    const slotEl = el?.closest('[data-slot]');
-    if (slotEl) {
-      const pi = parseInt(slotEl.dataset.pi), idx = parseInt(slotEl.dataset.idx);
-      const rev = pi === 0 ? rev1 : rev2;
-      if (!rev.has(idx)) {
-        setTent(m => { const n = new Map(m); if (source.type === 'slot') n.delete(`${source.pi}-${source.idx}`); n.set(`${pi}-${idx}`, source.ch); return n; });
-      } else if (source.type === 'slot') {
-        setTent(m => { const n = new Map(m); n.delete(`${source.pi}-${source.idx}`); return n; });
-      }
-    } else if (source.type === 'slot') {
-      setTent(m => { const n = new Map(m); n.delete(`${source.pi}-${source.idx}`); return n; });
-    } else if (source.type === 'pool') {
-      const poolEl = el?.closest('[data-pool-tile]');
-      if (poolEl) {
-        const targetIdx = parseInt(poolEl.dataset.poolTile);
-        if (targetIdx !== source.poolIdx) {
-          const src = source.poolIdx;
-          setPool(prev => { const next = [...prev]; const [moved] = next.splice(src, 1); next.splice(targetIdx, 0, moved); return next; });
-        }
-      }
-    }
-    touchStateRef.current = { startPos: null, isDragging: false, source: null };
-    setTouchDragSlot(null); setGhostPos(null); setGhostChar(null); setDrag(null);
-    poolDragIdx.current = null; dragSrc.current = null;
-  }
-
-  function poolTileTouch(ch, i) {
-    const TH = 8;
-    return {
-      onTouchStart: e => { const t = e.touches[0]; touchStateRef.current = { startPos: { x: t.clientX, y: t.clientY }, isDragging: false, source: { type: 'pool', ch, poolIdx: i } }; },
-      onTouchMove: e => {
-        const { startPos, isDragging } = touchStateRef.current; if (!startPos) return;
-        const t = e.touches[0];
-        if (!isDragging && Math.hypot(t.clientX - startPos.x, t.clientY - startPos.y) > TH) {
-          if (allInstancesRevealed(ch, accepted0, accepted1, rev1, rev2)) return;
-          startTouchDrag({ type: 'pool', ch, poolIdx: i }, ch, t.clientX, t.clientY);
-        } else if (isDragging) { setGhostPos({ x: t.clientX, y: t.clientY }); }
-      },
-      onTouchEnd: e => {
-        if (touchStateRef.current.isDragging) { handleTouchDrop(e.changedTouches[0].clientX, e.changedTouches[0].clientY); }
-        else { touchStateRef.current = { startPos: null, isDragging: false, source: null }; }
-      },
-    };
-  }
-
-  function slotTileTouch(pi, idx, ch) {
-    const TH = 8;
-    return {
-      onTouchStart: e => { const t = e.touches[0]; touchStateRef.current = { startPos: { x: t.clientX, y: t.clientY }, isDragging: false, source: { type: 'slot', ch, pi, idx } }; },
-      onTouchMove: e => {
-        const { startPos, isDragging } = touchStateRef.current; if (!startPos) return;
-        const t = e.touches[0];
-        if (!isDragging && Math.hypot(t.clientX - startPos.x, t.clientY - startPos.y) > TH) { startTouchDrag({ type: 'slot', ch, pi, idx }, ch, t.clientX, t.clientY); }
-        else if (isDragging) { setGhostPos({ x: t.clientX, y: t.clientY }); }
-      },
-      onTouchEnd: e => {
-        if (touchStateRef.current.isDragging) { handleTouchDrop(e.changedTouches[0].clientX, e.changedTouches[0].clientY); }
-        else { touchStateRef.current = { startPos: null, isDragging: false, source: null }; }
-      },
-    };
-  }
-
-  function handleDropOnSlot(pi, idx) {
-    if (!dragging) return;
-    const rev = pi === 0 ? rev1 : rev2;
-    if (rev.has(idx)) return;
-    const src = dragSrc.current; // capture before clearing — ref may be nulled before updater runs
-    dragSrc.current = null;
-    setTent(m => {
-      const n = new Map(m);
-      if (src) n.delete(`${src.pi}-${src.idx}`);
-      n.set(`${pi}-${idx}`, dragging);
-      return n;
-    });
-    setTouchDragSlot(null);
-    setDrag(null);
-  }
-
   // ── Reveal / guess handlers ──────────────────────────────────────────────
   function handleTileClick(ch) {
     if (gaveUp || allInstancesRevealed(ch, accepted0, accepted1, rev1, rev2)) return;
@@ -972,9 +848,6 @@ export default function App() {
     for (let i = 0; i < accepted0.length; i++) if (accepted0[i] === ch) nr1.add(i);
     for (let i = 0; i < accepted1.length; i++) if (accepted1[i] === ch) nr2.add(i);
     setRev1(nr1); setRev2(nr2);
-    const t = new Map(tentative);
-    for (const [key, val] of tentative) if (val === ch) t.delete(key);
-    setTent(t);
     setTyped1(td => { const n = { ...td }; for (let i = 0; i < accepted0.length; i++) if (accepted0[i] === ch) delete n[i]; return n; });
     setTyped2(td => { const n = { ...td }; for (let i = 0; i < accepted1.length; i++) if (accepted1[i] === ch) delete n[i]; return n; });
     setPicks(p => p - 1);
@@ -982,13 +855,13 @@ export default function App() {
 
   function getNextTypeable(pi, from) {
     const phrase = pi === 0 ? p1 : p2, rev = pi === 0 ? rev1 : rev2;
-    for (let i = from + 1; i < phrase.length; i++) if (!rev.has(i) && phrase[i] !== ' ' && !tentative.has(`${pi}-${i}`)) return i;
+    for (let i = from + 1; i < phrase.length; i++) if (!rev.has(i) && phrase[i] !== ' ') return i;
     return null;
   }
 
   function getPrevTypeable(pi, from) {
     const phrase = pi === 0 ? p1 : p2, rev = pi === 0 ? rev1 : rev2;
-    for (let i = from - 1; i >= 0; i--) if (!rev.has(i) && phrase[i] !== ' ' && !tentative.has(`${pi}-${i}`)) return i;
+    for (let i = from - 1; i >= 0; i--) if (!rev.has(i) && phrase[i] !== ' ') return i;
     return null;
   }
 
@@ -1011,9 +884,8 @@ export default function App() {
   }
 
   function buildGuess(pi) {
-    // Use accepted phrase as template so revealed chars match what's actually displayed
     const phrase = pi === 0 ? accepted0 : accepted1, rev = pi === 0 ? rev1 : rev2, typed = pi === 0 ? typed1 : typed2;
-    return phrase.split('').map((ch, i) => { if (rev.has(i)) return ch; const tent = tentative.get(`${pi}-${i}`); if (tent) return tent; return typed[i] || ''; }).join('');
+    return phrase.split('').map((ch, i) => rev.has(i) ? ch : (typed[i] || '')).join('');
   }
 
   function submitGuess(pi) {
@@ -1044,12 +916,10 @@ export default function App() {
 
   function hasPlaced(pi) {
     const typed = pi === 0 ? typed1 : typed2;
-    for (const key of tentative.keys()) if (key.startsWith(`${pi}-`)) return true;
     return Object.keys(typed).length > 0;
   }
 
   function recallPhrase(pi) {
-    setTent(m => { const n = new Map(); for (const [k, v] of m) if (!k.startsWith(`${pi}-`)) n.set(k, v); return n; });
     if (pi === 0) setTyped1({}); else setTyped2({});
   }
 
@@ -1129,24 +999,13 @@ export default function App() {
                     <div style={{ display: 'flex', gap: GAP, alignItems: 'flex-end' }}>
                       {line.text.split('').map((ch, j) => {
                         const i = line.start + j, isGiveUpReveal = giveUpRev.has(i), revealed = rev.has(i) || isGiveUpReveal, isSpace = ch === ' ';
-                        const tentChar = tentative.get(`${pi}-${i}`), isFocused = focused === i, canDrop = !revealed && !!dragging;
+                        const isFocused = focused === i;
                         if (isSpace) return <div key={i} style={{ width: SPACE_W, flexShrink: 0 }} />;
-                        const borderColor = isGiveUpReveal ? 'var(--text)' : (err && !revealed) ? 'var(--error)' : (revealed || isFocused || (canDrop && !tentChar)) ? 'var(--accent)' : 'var(--border)';
+                        const borderColor = isGiveUpReveal ? 'var(--text)' : (err && !revealed) ? 'var(--error)' : (revealed || isFocused) ? 'var(--accent)' : 'var(--border)';
                         return (
-                          <div key={i} data-slot="true" data-pi={pi} data-idx={i}
-                            style={{ width: SLOT_W, height: 38, flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: `2px solid ${borderColor}`, background: canDrop && !tentChar && !revealed ? 'var(--accent-dim)' : 'transparent', borderRadius: canDrop && !tentChar && !revealed ? '3px 3px 0 0' : 0, transition: 'background 0.12s, border-color 0.2s' }}
-                            onDragOver={e => { if (!revealed) e.preventDefault(); }}
-                            onDrop={e => { e.preventDefault(); handleDropOnSlot(pi, i); }}>
+                          <div key={i} style={{ width: SLOT_W, height: 38, flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: `2px solid ${borderColor}`, transition: 'border-color 0.2s' }}>
                             {revealed && <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', fontWeight: 500, color: isGiveUpReveal ? 'var(--text)' : 'var(--accent)', userSelect: 'none' }}>{isGiveUpReveal ? ch : (pi === 0 ? accepted0 : accepted1)[i]}</span>}
-                            {!revealed && !gaveUp && tentChar && (
-                              <div draggable={!IS_TOUCH} {...slotTileTouch(pi, i, tentChar)}
-                                onDragStart={e => { e.stopPropagation(); startDragFromSlot(pi, i, tentChar); }} onDragEnd={handleDragEnd}
-                                onClick={e => { e.stopPropagation(); handleTileClick(tentChar); }}
-                                style={{ position: 'absolute', inset: '0 0 2px 0', border: `1.5px solid ${pendingTile === tentChar ? 'var(--pending-bg)' : 'var(--border)'}`, borderRadius: 3, background: pendingTile === tentChar ? 'var(--pending-bg)' : 'var(--tile-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', fontWeight: 500, color: pendingTile === tentChar ? 'var(--pending-text)' : 'var(--text)', cursor: 'pointer', userSelect: 'none', boxShadow: pendingTile === tentChar ? 'none' : '0 1px 3px rgba(0,0,0,0.12)', touchAction: 'none', opacity: touchDragSlot?.pi === pi && touchDragSlot?.idx === i ? 0 : 1, transition: 'background 0.15s, color 0.15s' }}>
-                                {tentChar}
-                              </div>
-                            )}
-                            {!revealed && !gaveUp && !tentChar && (
+                            {!revealed && !gaveUp && (
                               <>
                                 {typed[i] ? <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', fontWeight: 500, color: 'var(--text)', userSelect: 'none', pointerEvents: 'none' }}>{typed[i]}</span>
                                   : isFocused ? <span className="slot-cursor" style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.9rem', fontWeight: 300, color: 'var(--accent)', userSelect: 'none', pointerEvents: 'none', lineHeight: 1 }}>|</span>
@@ -1169,7 +1028,7 @@ export default function App() {
               {!gaveUp && (won
                 ? <div style={{ paddingLeft: NUM_W, fontSize: '1rem', color: 'var(--accent)', fontWeight: 700 }}>✓</div>
                 : <div style={{ display: 'flex', gap: 8, paddingLeft: NUM_W }}>
-                    <button onClick={() => recallPhrase(pi)} disabled={!hasPlaced(pi)} title="Recall tiles" style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--dim)', width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', padding: 0, flexShrink: 0, cursor: hasPlaced(pi) ? 'pointer' : 'default', opacity: hasPlaced(pi) ? 1 : 0.35, transition: 'opacity 0.2s' }}>↺</button>
+                    <button onClick={() => recallPhrase(pi)} disabled={!hasPlaced(pi)} title="Clear" style={{ background: 'none', border: '1px solid var(--border)', color: 'var(--dim)', width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.85rem', padding: 0, flexShrink: 0, cursor: hasPlaced(pi) ? 'pointer' : 'default', opacity: hasPlaced(pi) ? 1 : 0.35, transition: 'opacity 0.2s' }}>↺</button>
                     <button onClick={() => submitGuess(pi)} style={{ background: 'var(--accent)', border: 'none', color: '#fff', fontFamily: "'DM Mono',monospace", fontSize: '0.62rem', letterSpacing: '0.16em', textTransform: 'uppercase', padding: '0.5rem 0.7rem', borderRadius: 3, cursor: 'pointer', fontWeight: 500 }}>Submit</button>
                   </div>
               )}
@@ -1182,39 +1041,34 @@ export default function App() {
         <button onClick={handleGiveUp} style={{ background: 'none', border: 'none', color: 'var(--dim)', fontFamily: "'DM Mono',monospace", fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase', textDecoration: 'underline', cursor: 'pointer', padding: '0.2rem 0.4rem' }}>I give up</button>
       )}
 
-      {/* Tiles-left indicator, floated above the rack */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <div style={dimLabel}>tiles left</div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {Array.from({ length: MAX_PICKS }).map((_, i) => (
-            <div key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: i < picksLeft ? 'var(--accent)' : 'var(--border-dim)', transition: 'background 0.3s' }} />
-          ))}
-        </div>
-      </div>
-
       {/* Tile rack */}
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.6rem',
         background: 'var(--rack-bg)', border: '1px solid var(--rack-border)',
-        borderRadius: 14, padding: '0.9rem 1.4rem 1.1rem',
+        borderRadius: 14, padding: '0.75rem 1.4rem 0.9rem',
         boxShadow: 'inset 0 2px 3px rgba(0,0,0,0.08), inset 0 -1px 0 rgba(255,255,255,0.3), 0 1px 2px rgba(0,0,0,0.05)',
       }}>
+        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.68rem', letterSpacing: '0.1em', color: 'var(--text)', textTransform: 'uppercase', textAlign: 'center', opacity: 0.65 }}>Double click a tile to reveal</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', maxWidth: 520 }}>
           {pool.map((ch, i) => {
             const done = gaveUp || allInstancesRevealed(ch, accepted0, accepted1, rev1, rev2);
             return (
-              <div key={ch} data-pool-tile={i} draggable={!IS_TOUCH} {...poolTileTouch(ch, i)}
-                onDragStart={() => startDragFromPool(ch, i)} onDragEnd={handleDragEnd}
-                onDragOver={e => e.preventDefault()}
-                onDrop={e => { e.preventDefault(); e.stopPropagation(); if (poolDragIdx.current !== null && poolDragIdx.current !== i) { const src = poolDragIdx.current; setPool(prev => { const next = [...prev]; const [moved] = next.splice(src, 1); next.splice(i, 0, moved); return next; }); } poolDragIdx.current = null; setDrag(null); }}
+              <div key={ch}
                 onClick={() => handleTileClick(ch)}
-                style={{ width: 36, height: 42, border: `1.5px solid ${done ? 'var(--border-dim)' : pendingTile === ch ? 'var(--pending-bg)' : 'var(--border)'}`, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'DM Mono',monospace", fontSize: '0.9rem', fontWeight: 500, background: done ? 'transparent' : pendingTile === ch ? 'var(--pending-bg)' : 'var(--tile-bg)', color: done ? 'var(--border-dim)' : pendingTile === ch ? 'var(--pending-text)' : 'var(--text)', cursor: done ? 'default' : 'pointer', userSelect: 'none', opacity: done ? 0.35 : 1, transition: 'background 0.15s, color 0.15s, opacity 0.3s', boxShadow: !done && pendingTile !== ch ? '0 1px 3px rgba(0,0,0,0.08)' : 'none', touchAction: 'none' }}>
+                style={{ width: 36, height: 42, border: `1.5px solid ${done ? 'var(--border-dim)' : pendingTile === ch ? 'var(--pending-bg)' : 'var(--border)'}`, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'DM Mono',monospace", fontSize: '0.9rem', fontWeight: 500, background: done ? 'transparent' : pendingTile === ch ? 'var(--pending-bg)' : 'var(--tile-bg)', color: done ? 'var(--border-dim)' : pendingTile === ch ? 'var(--pending-text)' : 'var(--text)', cursor: done ? 'default' : 'pointer', userSelect: 'none', opacity: done ? 0.35 : 1, transition: 'background 0.15s, color 0.15s, opacity 0.3s', boxShadow: !done && pendingTile !== ch ? '0 1px 3px rgba(0,0,0,0.08)' : 'none' }}>
                 {ch}
               </div>
             );
           })}
         </div>
-        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.68rem', letterSpacing: '0.1em', color: 'var(--text)', textTransform: 'uppercase', textAlign: 'center', opacity: 0.65 }}>Double click to reveal</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={dimLabel}>tiles left</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {Array.from({ length: MAX_PICKS }).map((_, i) => (
+              <div key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: i < picksLeft ? 'var(--accent)' : 'var(--border-dim)', transition: 'background 0.3s' }} />
+            ))}
+          </div>
+        </div>
       </div>
 
       {showResult && (
@@ -1229,12 +1083,6 @@ export default function App() {
 
       {showArchive && <ArchiveModal onClose={() => setShowArchive(false)} />}
       {showStats && <StatsModal onClose={() => setShowStats(false)} />}
-
-      {ghostPos && ghostChar && (
-        <div style={{ position: 'fixed', left: ghostPos.x - 18, top: ghostPos.y - 21 - GHOST_LIFT, width: 36, height: 42, border: '1.5px solid var(--border)', borderRadius: 4, background: 'var(--tile-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'DM Mono',monospace", fontSize: '0.9rem', fontWeight: 500, color: 'var(--text)', pointerEvents: 'none', zIndex: 9999, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', opacity: 0.9, userSelect: 'none' }}>
-          {ghostChar}
-        </div>
-      )}
 
       {/* Help modal */}
       {showHelp && (
