@@ -657,7 +657,7 @@ function ResultModal({ outcome, reveals, streak, onClose, onArchive }) {
     `doppel — ${PUZZLE_DATE}`,
     `"${PUZZLE_CLUE}"`,
     win ? (reveals === 0 ? 'Perfect, no reveals! 🦄' : `${heading}${dots ? ' ' + dots : ''}`) : `Gave up 🔴${dots ? ' ' + dots : ''}`,
-    IS_ARCHIVE_MODE ? `doppel.fyi/?date=${PUZZLE_DATE_ISO}` : 'doppel.fyi',
+    IS_ARCHIVE_MODE ? `https://doppel.fyi/?date=${PUZZLE_DATE_ISO}` : 'https://doppel.fyi',
   ].filter(Boolean).join('\n');
 
   async function doShare() {
