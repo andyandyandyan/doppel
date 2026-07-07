@@ -930,7 +930,7 @@ export default function App() {
     <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--accent)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 700, flexShrink: 0, fontFamily: "'DM Mono',monospace", marginRight: 6, alignSelf: 'flex-end', marginBottom: 4 }}>{n}</div>
   );
 
-  const navBtn = { background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'DM Mono',monospace", fontSize: '1.2rem', color: 'var(--accent)', padding: '0.25rem 0.5rem' };
+  const navBtn = { background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'DM Mono',monospace", fontSize: '2.4rem', color: 'var(--accent)', padding: '0.25rem 0.5rem' };
   const CW = cardWidth || 340;
   const PAD = 24; // 1.5rem card padding
 
