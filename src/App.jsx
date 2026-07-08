@@ -65,7 +65,7 @@ function clearProgress() { localStorage.removeItem(PROGRESS_KEY); }
 function saveResult(dateISO, outcome, reveals) { const r = loadResults(); r[dateISO] = { outcome, reveals, ...(IS_ARCHIVE_MODE ? { archive: true } : {}) }; localStorage.setItem(RESULTS_KEY, JSON.stringify(r)); clearProgress(); }
 // Both phrases have spaces at identical indices → either answer is valid in either slot with no reveals used.
 const SPACES_MIRROR = !PUZZLE_ERROR && (() => { const { p1, p2 } = PUZZLE; for (let i = 0; i < p1.length; i++) if ((p1[i] === ' ') !== (p2[i] === ' ')) return false; return true; })();
-const PREV_RESULT = !PUZZLE_ERROR && !IS_ARCHIVE_MODE ? (loadResults()[PUZZLE_DATE_ISO] || null) : null;
+const PREV_RESULT = !PUZZLE_ERROR ? (loadResults()[PUZZLE_DATE_ISO] || null) : null;
 // In-progress state for mid-game refreshes. Only used for non-archive, not-yet-completed puzzles.
 function loadProgress() {
   if (PREV_RESULT) return null;
