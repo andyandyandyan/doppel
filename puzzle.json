@@ -190,5 +190,23 @@
     "title": "they went to space",
     "phrase1": "JIM LOVELL",
     "phrase2": "JOHN GLENN"
+},
+  {
+    "date": "2026-07-17",
+    "title": "defunct superpowers",
+    "phrase1": "SOVIET UNION",
+    "phrase2": "ROMAN EMPIRE"
+},
+  {
+    "date": "2026-07-18",
+    "title": "sung in a kindergarten classroom",
+    "phrase1": "HEAD SHOULDERS KNEES AND TOES",
+    "phrase2": "LONDON BRIDGE IS FALLING DOWN"
+},
+  {
+    "date": "2026-07-19",
+    "title": "far far away (but not that long ago)",
+    "phrase1": "CASSIAN ANDOR",
+    "phrase2": "REY SKYWALKER"
 }
 ]
