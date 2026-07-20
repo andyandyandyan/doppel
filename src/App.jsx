@@ -518,6 +518,7 @@ function ArchiveModal({ onClose }) {
   const canFwd   = viewYear < today.getFullYear()    || (viewYear === today.getFullYear()    && viewMonth < today.getMonth());
 
   // Sliding strip: index 0=prev, 1=current(default), 2=next
+  const [selectedDate, setSelectedDate] = useState(null);
   const [stripIdx,  setStripIdx]  = useState(1);
   const [dragDelta, setDragDelta] = useState(0);
   const [sliding,   setSliding]   = useState(false); // true = transition on
@@ -539,8 +540,8 @@ function ArchiveModal({ onClose }) {
     }, 320);
   }
 
-  function goBack()    { if (!canBack) return; const p = shiftMonth(viewYear, viewMonth, -1); commitNav(0, () => { setViewYear(p.year); setViewMonth(p.month); }); }
-  function goForward() { if (!canFwd)  return; const f = shiftMonth(viewYear, viewMonth, +1); commitNav(2, () => { setViewYear(f.year); setViewMonth(f.month); }); }
+  function goBack()    { if (!canBack) return; const p = shiftMonth(viewYear, viewMonth, -1); commitNav(0, () => { setViewYear(p.year); setViewMonth(p.month); setSelectedDate(null); }); }
+  function goForward() { if (!canFwd)  return; const f = shiftMonth(viewYear, viewMonth, +1); commitNav(2, () => { setViewYear(f.year); setViewMonth(f.month); setSelectedDate(null); }); }
 
   function onTouchStart(e) {
     if (navigating.current) return;
@@ -596,12 +597,14 @@ function ArchiveModal({ onClose }) {
             );
             const won = res?.outcome === 'win';
             const indicator = !res ? null : won ? (res.reveals === 0 ? '★' : '●'.repeat(res.reveals)) : '✗';
+            const isSelected = selectedDate === dateISO;
             return (
-              <a key={ci} href={`?date=${dateISO}`} title={`"${puzzle.title}"`}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 34, borderRadius: 5, textDecoration: 'none', cursor: 'pointer', background: res ? 'rgba(74,143,168,0.13)' : 'rgba(74,143,168,0.07)', border: `1px solid ${res ? 'rgba(74,143,168,0.35)' : 'rgba(74,143,168,0.18)'}`, gap: 1 }}>
+              <div key={ci}
+                onClick={() => setSelectedDate(isSelected ? null : dateISO)}
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 34, borderRadius: 5, cursor: 'pointer', background: isSelected ? 'rgba(74,143,168,0.25)' : res ? 'rgba(74,143,168,0.13)' : 'rgba(74,143,168,0.07)', border: `2px solid ${isSelected ? 'var(--accent)' : res ? 'rgba(74,143,168,0.35)' : 'rgba(74,143,168,0.18)'}`, gap: 1 }}>
                 <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', fontWeight: 500, color: 'var(--accent)', lineHeight: 1 }}>{day}</span>
                 {indicator && <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.5rem', color: won ? 'var(--accent)' : 'var(--dim)', lineHeight: 1, letterSpacing: '0.03em' }}>{indicator}</span>}
-              </a>
+              </div>
             );
           })}
         </div>
@@ -640,6 +643,12 @@ function ArchiveModal({ onClose }) {
               </div>
             </div>
         }
+        {selectedDate && puzzleByDate[selectedDate] && (
+          <div style={{ marginTop: '1rem', paddingTop: '0.8rem', borderTop: '1px solid var(--border-dim)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+            <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '0.95rem', color: 'var(--text)', flex: 1, lineHeight: 1.3 }}>"{puzzleByDate[selectedDate].title}"</div>
+            <a href={`?date=${selectedDate}`} style={{ background: 'var(--accent)', color: '#fff', borderRadius: 3, padding: '0.45rem 0.9rem', fontFamily: "'DM Mono',monospace", fontSize: '0.68rem', letterSpacing: '0.12em', textTransform: 'uppercase', textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>Play →</a>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1043,11 +1052,19 @@ export default function App() {
 
       {/* Tile rack */}
       <div style={{
+        position: 'relative',
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.6rem',
         background: 'var(--rack-bg)', border: '1px solid var(--rack-border)',
         borderRadius: 14, padding: '0.75rem 1.4rem 0.9rem',
         boxShadow: 'inset 0 2px 3px rgba(0,0,0,0.08), inset 0 -1px 0 rgba(255,255,255,0.3), 0 1px 2px rgba(0,0,0,0.05)',
       }}>
+        {!gaveUp && !(won1 && won2) && (
+          <button onClick={() => setPool(prev => [...prev].sort(() => Math.random() - 0.5))}
+            title="Shuffle tiles"
+            style={{ position: 'absolute', top: 8, right: 10, background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.95rem', opacity: 0.45, padding: 0, lineHeight: 1 }}>
+            🔀
+          </button>
+        )}
         <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.68rem', letterSpacing: '0.1em', color: 'var(--text)', textTransform: 'uppercase', textAlign: 'center', opacity: 0.65 }}>Double click a tile to reveal</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', maxWidth: 520 }}>
           {pool.map((ch, i) => {
