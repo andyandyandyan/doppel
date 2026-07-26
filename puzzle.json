@@ -250,5 +250,47 @@
     "title": "heard on 'survivor'",
     "phrase1": "I AM NOT HERE TO MAKE FRIENDS",
     "phrase2": "IMMUNITY IS BACK UP FOR GRABS"
+},
+  {
+    "date": "2026-07-27",
+    "title": "old west iconography",
+    "phrase1": "GUNSLINGER",
+    "phrase2": "TUMBLEWEED"
+},
+  {
+    "date": "2026-07-28",
+    "title": "quiet coworkers",
+    "phrase1": "LIBRARIAN",
+    "phrase2": "ARCHIVIST"
+},
+  {
+    "date": "2026-07-29",
+    "title": "robber barons",
+    "phrase1": "ANDREW CARNEGIE",
+    "phrase2": "LELAND STANFORD"
+},
+  {
+    "date": "2026-07-30",
+    "title": "plumbing issues",
+    "phrase1": "LEAKY FAUCET",
+    "phrase2": "NO HOT WATER"
+},
+  {
+    "date": "2026-07-31",
+    "title": "dystopian visions",
+    "phrase1": "BLADE RUNNER",
+    "phrase2": "BLACK MIRROR"
+},
+  {
+    "date": "2026-08-01",
+    "title": "playground refrains",
+    "phrase1": "FINDERS KEEPERS LOSERS WEEPERS",
+    "phrase2": "LAST ONE THERE IS A ROTTEN EGG"
+},
+  {
+    "date": "2026-08-02",
+    "title": "suitors of elaine",
+    "phrase1": "TIM WHATLEY",
+    "phrase2": "DAVID PUDDY"
 }
 ]
