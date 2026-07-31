@@ -88,10 +88,10 @@ function calcStreak(results) {
 }
 
 // ─── Demo data for help screens ───────────────────────────────────────────────
-const DP1 = 'KEVIN BACON';
-const DP2 = 'BRIE LARSON';
-const DR1 = new Set([5, 9, 10]); // space(5), O(9), N(10)
-const DR2 = new Set([4, 9, 10]); // space(4), O(9), N(10)
+const DP1 = 'CHEEZ ITS';
+const DP2 = 'SUN CHIPS';
+const DR1 = new Set([5, 6, 8]); // space(5), I(6), S(8)
+const DR2 = new Set([3, 6, 8]); // space(3), I(6), S(8)
 
 // ─── Mini display components ──────────────────────────────────────────────────
 function MiniSlot({ ch, state }) {
@@ -154,7 +154,7 @@ function HelpScreen1() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '1rem', color: 'var(--dim)', marginBottom: 10 }}>
-        "they are what we eat"
+        "vending machine fare"
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <MiniPhrase phrase={DP1} getState={() => 'plain'} />
@@ -165,11 +165,11 @@ function HelpScreen1() {
 }
 
 function HelpScreen2() {
-  const ROW_W = DP1.length * 22 + (DP1.length - 1) * 2; // 262
-  const pairCenter = (DP1.length - 2) * 24 + 23; // center of the final O/N columns, within row coords
+  const ROW_W = DP1.length * 22 + (DP1.length - 1) * 2; // 214
   const SIDE = 50; // room for the corner labels on each side
   const OUTER_W = ROW_W + SIDE * 2;
-  const ovalCx = SIDE + pairCenter;
+  const iOvalCx = SIDE + 6 * 24 + 11; // 205 — I column center in OUTER_W coords
+  const sOvalCx = SIDE + 8 * 24 + 11; // 253 — S column center in OUTER_W coords
 
   return (
     <div style={{ position: 'relative', width: OUTER_W }}>
@@ -189,20 +189,22 @@ function HelpScreen2() {
         <HandLabel style={{ display: 'block' }}>same location</HandLabel>
       </div>
       <svg width={OUTER_W} height="118" style={{ position: 'absolute', top: 30, left: 0, overflow: 'visible', pointerEvents: 'none' }}>
-        <path d={`M${OUTER_W - SIDE + 8},2 C${OUTER_W - SIDE - 14},36 ${ovalCx + 14},66 ${ovalCx},98`} fill="none" stroke="var(--accent)" strokeWidth="1.3" strokeLinecap="round" />
+        <path d={`M${OUTER_W - SIDE + 8},2 C${OUTER_W - SIDE - 8},30 ${iOvalCx + 10},70 ${iOvalCx},98`} fill="none" stroke="var(--accent)" strokeWidth="1.3" strokeLinecap="round" />
+        <path d={`M${OUTER_W - SIDE + 8},2 C${OUTER_W - SIDE - 2},36 ${sOvalCx + 7},66 ${sOvalCx},98`} fill="none" stroke="var(--accent)" strokeWidth="1.3" strokeLinecap="round" />
       </svg>
 
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 40 }}>
         <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '1rem', color: 'var(--dim)', marginBottom: 10 }}>
-          "they are what we eat"
+          "vending machine fare"
         </div>
 
         <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 10 }}>
           <MiniPhrase phrase={DP1} getState={() => 'plain'} />
           <MiniPhrase phrase={DP2} getState={() => 'plain'} />
-          {/* single oval circling the O/N pair in both phrases */}
+          {/* two ovals — one around shared I(6), one around shared S(8) */}
           <svg width={ROW_W + 20} height="86" style={{ position: 'absolute', left: -10, top: -8, overflow: 'visible', pointerEvents: 'none' }}>
-            <ellipse cx={pairCenter + 10} cy="43" rx="32" ry="43" fill="none" stroke="var(--accent)" strokeWidth="1.3" />
+            <ellipse cx={6 * 24 + 21} cy="43" rx="16" ry="43" fill="none" stroke="var(--accent)" strokeWidth="1.3" />
+            <ellipse cx={8 * 24 + 21} cy="43" rx="16" ry="43" fill="none" stroke="var(--accent)" strokeWidth="1.3" />
           </svg>
         </div>
 
@@ -218,14 +220,14 @@ function HelpScreen2() {
   );
 }
 
-// Fadeable indices for each demo phrase: every letter except the final two.
-function fadeableIndices(phrase) {
+// Fadeable indices for each demo phrase: every letter not in the pre-revealed set.
+function fadeableIndices(phrase, revealed) {
   const out = [];
-  for (let i = 0; i < phrase.length - 2; i++) if (phrase[i] !== ' ') out.push(i);
+  for (let i = 0; i < phrase.length; i++) if (phrase[i] !== ' ' && !revealed.has(i)) out.push(i);
   return out;
 }
-const FADE1 = fadeableIndices(DP1);
-const FADE2 = fadeableIndices(DP2);
+const FADE1 = fadeableIndices(DP1, DR1);
+const FADE2 = fadeableIndices(DP2, DR2);
 // Reveal order: all of row1's letters, left to right, then all of row2's.
 const FADE_SEQUENCE = [
   ...FADE1.map(idx => ({ pi: 0, idx })),
@@ -277,7 +279,7 @@ function HelpScreen3({ active }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '1rem', color: 'var(--dim)', marginBottom: 10 }}>
-        "they are what we eat"
+        "vending machine fare"
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {renderPhrase(DP1, hidden1)}
@@ -288,10 +290,10 @@ function HelpScreen3({ active }) {
 }
 
 function HelpScreen4({ active }) {
-  const TILES = ['A', 'B', 'R', 'E', 'L'];
+  const TILES = ['C', 'H', 'Z', 'E', 'N'];
   const [rev1, setRev1] = useState(new Set(DR1));
   const [rev2, setRev2] = useState(new Set(DR2));
-  const [tiles, setTiles] = useState({ A: 'normal', B: 'normal', R: 'normal', E: 'normal', L: 'normal' });
+  const [tiles, setTiles] = useState({ C: 'normal', H: 'normal', Z: 'normal', E: 'normal', N: 'normal' });
   const [cycle, setCycle] = useState(0);
   const [cursorX, setCursorX] = useState(null);
   const [clicking, setClicking] = useState(false);
@@ -302,24 +304,24 @@ function HelpScreen4({ active }) {
   useEffect(() => {
     if (!active) return;
     setRev1(new Set(DR1)); setRev2(new Set(DR2));
-    setTiles({ A: 'normal', B: 'normal', R: 'normal', E: 'normal', L: 'normal' });
+    setTiles({ C: 'normal', H: 'normal', Z: 'normal', E: 'normal', N: 'normal' });
     setCursorX(null); setClicking(false);
     const ts = []; const t = (ms, fn) => ts.push(setTimeout(fn, ms));
-    // B (index 1)
-    t(350,  () => setCursorX(tileCenter(1)));
-    t(500,  () => { setClicking(true); setTiles(s => ({ ...s, B: 'pending' })); });
+    // C (index 0): reveals C(0) in CHEEZ ITS and C(4) in SUN CHIPS
+    t(350,  () => setCursorX(tileCenter(0)));
+    t(500,  () => { setClicking(true); setTiles(s => ({ ...s, C: 'pending' })); });
     t(680,  () => setClicking(false));
-    t(1000, () => { setTiles(s => ({ ...s, B: 'done' })); setRev1(s => new Set([...s, 6])); setRev2(s => new Set([...s, 0])); });
-    // R (index 2)
-    t(1350, () => setCursorX(tileCenter(2)));
-    t(1500, () => { setClicking(true); setTiles(s => ({ ...s, R: 'pending' })); });
+    t(1000, () => { setTiles(s => ({ ...s, C: 'done' })); setRev1(s => new Set([...s, 0])); setRev2(s => new Set([...s, 4])); });
+    // H (index 1): reveals H(1) in CHEEZ ITS and H(5) in SUN CHIPS
+    t(1350, () => setCursorX(tileCenter(1)));
+    t(1500, () => { setClicking(true); setTiles(s => ({ ...s, H: 'pending' })); });
     t(1680, () => setClicking(false));
-    t(2000, () => { setTiles(s => ({ ...s, R: 'done' })); setRev2(s => new Set([...s, 1, 7])); });
-    // E (index 3)
+    t(2000, () => { setTiles(s => ({ ...s, H: 'done' })); setRev1(s => new Set([...s, 1])); setRev2(s => new Set([...s, 5])); });
+    // E (index 3): reveals E(2) and E(3) in CHEEZ ITS
     t(2350, () => setCursorX(tileCenter(3)));
     t(2500, () => { setClicking(true); setTiles(s => ({ ...s, E: 'pending' })); });
     t(2680, () => setClicking(false));
-    t(3000, () => { setTiles(s => ({ ...s, E: 'done' })); setRev1(s => new Set([...s, 1])); setRev2(s => new Set([...s, 3])); });
+    t(3000, () => { setTiles(s => ({ ...s, E: 'done' })); setRev1(s => new Set([...s, 2, 3])); });
     t(4600, () => setCycle(c => c + 1));
     return () => ts.forEach(clearTimeout);
   }, [cycle, active]);
@@ -355,8 +357,10 @@ function HelpScreen4({ active }) {
 }
 
 function HelpScreen5({ active }) {
-  const REV1 = new Set([1, 5, 6, 9, 10]);
-  const REV2 = new Set([0, 1, 3, 4, 7, 9, 10]);
+  // CHEEZ ITS: C(0) H(1) E(2) E(3) already revealed; Z(4) T(7) to type
+  const REV1 = new Set([0, 1, 2, 3, 5, 6, 8]);
+  // SUN CHIPS: C(4) H(5) already revealed; S(0) U(1) N(2) P(7) to type
+  const REV2 = new Set([3, 4, 5, 6, 8]);
   const [t1, setT1] = useState({});
   const [t2, setT2] = useState({});
   const [win, setWin] = useState(false);
@@ -365,17 +369,13 @@ function HelpScreen5({ active }) {
     if (!active) return;
     setT1({}); setT2({}); setWin(false);
     const ts = []; const t = (ms, fn) => ts.push(setTimeout(fn, ms));
-    t(300,  () => setT1(s => ({ ...s, 0: 'K' })));
-    t(500,  () => setT1(s => ({ ...s, 2: 'V' })));
-    t(700,  () => setT1(s => ({ ...s, 3: 'I' })));
-    t(900,  () => setT1(s => ({ ...s, 4: 'N' })));
-    t(1100, () => setT1(s => ({ ...s, 7: 'A' })));
-    t(1300, () => setT1(s => ({ ...s, 8: 'C' })));
-    t(1600, () => setT2(s => ({ ...s, 2: 'I' })));
-    t(1800, () => setT2(s => ({ ...s, 5: 'L' })));
-    t(2000, () => setT2(s => ({ ...s, 6: 'A' })));
-    t(2200, () => setT2(s => ({ ...s, 8: 'S' })));
-    t(2600, () => setWin(true));
+    t(300,  () => setT1(s => ({ ...s, 4: 'Z' })));
+    t(500,  () => setT1(s => ({ ...s, 7: 'T' })));
+    t(700,  () => setT2(s => ({ ...s, 0: 'S' })));
+    t(900,  () => setT2(s => ({ ...s, 1: 'U' })));
+    t(1100, () => setT2(s => ({ ...s, 2: 'N' })));
+    t(1300, () => setT2(s => ({ ...s, 7: 'P' })));
+    t(1600, () => setWin(true));
     return () => ts.forEach(clearTimeout);
   }, [active]);
 
