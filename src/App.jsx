@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Analytics } from '@vercel/analytics/react';
 import puzzleSchedule from '../puzzle.json';
 
@@ -415,6 +415,77 @@ function renderHighlighted(text) {
   );
 }
 
+// ─── Particle system ──────────────────────────────────────────────────────────
+const SPARK_BLUE = ['#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe'];
+const SPARK_WHITE = ['#3b82f6', '#60a5fa', '#93c5fd', '#ffffff', '#e0f2fe'];
+
+const ParticleCanvas = forwardRef(function ParticleCanvas(_, ref) {
+  const canvasRef = useRef(null);
+  const particlesRef = useRef([]);
+  const rafRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    resize();
+    window.addEventListener('resize', resize);
+
+    function tick() {
+      const now = Date.now();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particlesRef.current = particlesRef.current.filter(p => now < p.expires);
+      for (const p of particlesRef.current) {
+        const age = (now - p.born) / (p.expires - p.born);
+        p.x += p.vx; p.y += p.vy; p.vy += 0.09;
+        const alpha = Math.max(0, 1 - age * age);
+        const r = p.r * (1 - age * 0.4);
+        ctx.globalAlpha = alpha;
+        if (p.star) {
+          ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot + age * p.spin);
+          ctx.fillStyle = p.color; ctx.beginPath();
+          for (let k = 0; k < 4; k++) {
+            const a = (k / 4) * Math.PI * 2;
+            ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+            const b = ((k + 0.5) / 4) * Math.PI * 2;
+            ctx.lineTo(Math.cos(b) * r * 0.32, Math.sin(b) * r * 0.32);
+          }
+          ctx.closePath(); ctx.fill(); ctx.restore();
+        } else {
+          ctx.fillStyle = p.color; ctx.beginPath();
+          ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      ctx.globalAlpha = 1;
+      rafRef.current = requestAnimationFrame(tick);
+    }
+    tick();
+    return () => { cancelAnimationFrame(rafRef.current); window.removeEventListener('resize', resize); };
+  }, []);
+
+  useImperativeHandle(ref, () => ({
+    burst(x, y, { count = 12, speed = 4, r = 3, colors = SPARK_BLUE, lifetime = 700, star = false } = {}) {
+      const now = Date.now();
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const s = speed * (0.4 + Math.random() * 0.6);
+        particlesRef.current.push({
+          x, y,
+          vx: Math.cos(angle) * s,
+          vy: Math.sin(angle) * s - speed * 0.25,
+          r: r * (0.5 + Math.random() * 0.9),
+          color: colors[Math.floor(Math.random() * colors.length)],
+          born: now,
+          expires: now + lifetime * (0.6 + Math.random() * 0.4),
+          star, rot: Math.random() * Math.PI * 2, spin: (Math.random() - 0.5) * 0.4,
+        });
+      }
+    },
+  }));
+
+  return <canvas ref={canvasRef} style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 9999 }} />;
+});
+
 // ─── Game helpers ─────────────────────────────────────────────────────────────
 function getCommon(p1, p2) {
   const s = new Set();
@@ -770,6 +841,7 @@ export default function App() {
   const helpDragDX = useRef(0);
 
   const slotRefs    = useRef({});
+  const psRef       = useRef(null);
 
   const LINES1 = wrapPhrase(p1);
   const LINES2 = wrapPhrase(p2);
@@ -782,7 +854,13 @@ export default function App() {
 
   // Pop up the result modal as soon as both phrases are solved.
   useEffect(() => {
-    if (won1 && won2) setShowResult(true);
+    if (won1 && won2) {
+      if (psRef.current) {
+        const cx = window.innerWidth / 2, cy = window.innerHeight * 0.4;
+        psRef.current.burst(cx, cy, { count: 55, speed: 9, r: 5, colors: SPARK_WHITE, lifetime: 1400 });
+      }
+      setShowResult(true);
+    }
   }, [won1, won2]);
 
   // Persist mid-game state so a refresh doesn't start the puzzle over.
@@ -854,12 +932,23 @@ export default function App() {
   function handleReveal(ch) {
     if (picksLeft <= 0 || allInstancesRevealed(ch, accepted0, accepted1, rev1, rev2)) return;
     const nr1 = new Set(rev1), nr2 = new Set(rev2);
-    for (let i = 0; i < accepted0.length; i++) if (accepted0[i] === ch) nr1.add(i);
-    for (let i = 0; i < accepted1.length; i++) if (accepted1[i] === ch) nr2.add(i);
+    const newSlots = [];
+    for (let i = 0; i < accepted0.length; i++) if (accepted0[i] === ch) { if (!rev1.has(i)) newSlots.push({ pi: 0, i }); nr1.add(i); }
+    for (let i = 0; i < accepted1.length; i++) if (accepted1[i] === ch) { if (!rev2.has(i)) newSlots.push({ pi: 1, i }); nr2.add(i); }
     setRev1(nr1); setRev2(nr2);
     setTyped1(td => { const n = { ...td }; for (let i = 0; i < accepted0.length; i++) if (accepted0[i] === ch) delete n[i]; return n; });
     setTyped2(td => { const n = { ...td }; for (let i = 0; i < accepted1.length; i++) if (accepted1[i] === ch) delete n[i]; return n; });
     setPicks(p => p - 1);
+    if (psRef.current) {
+      for (const { pi, i } of newSlots) {
+        const el = slotRefs.current[`${pi}-${i}`];
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        psRef.current.burst(rect.left + rect.width / 2, rect.top + rect.height / 2, {
+          count: 9, speed: 3.5, r: 3.5, colors: SPARK_BLUE, lifetime: 650, star: true,
+        });
+      }
+    }
   }
 
   function getNextTypeable(pi, from) {
@@ -917,6 +1006,19 @@ export default function App() {
       const otherWon = pi === 0 ? won2 : won1;
       if (otherWon && !isAlreadyPlayed) saveResult(PUZZLE_DATE_ISO, 'win', MAX_PICKS - picksLeft);
       if (pi === 0) setWon1(true); else setWon2(true);
+      if (psRef.current) {
+        phrase.split('').forEach((ch, i) => {
+          if (ch === ' ') return;
+          const el = slotRefs.current[`${pi}-${i}`];
+          if (!el) return;
+          const rect = el.getBoundingClientRect();
+          setTimeout(() => {
+            psRef.current?.burst(rect.left + rect.width / 2, rect.top + rect.height / 2, {
+              count: 6, speed: 2.8, r: 2.8, colors: SPARK_BLUE, lifetime: 520,
+            });
+          }, i * 38);
+        });
+      }
     } else {
       const setErr = pi === 0 ? setErr1 : setErr2;
       setErr(true); setTimeout(() => setErr(false), 1000);
@@ -960,6 +1062,8 @@ export default function App() {
 
   return (
     <div style={{ minHeight: '100dvh', background: 'var(--bg)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '2.5rem 1.5rem', gap: '1.8rem' }}>
+
+      <ParticleCanvas ref={psRef} />
 
       {/* Title + help button */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
