@@ -736,7 +736,7 @@ function ResultModal({ outcome, reveals, streak, onClose, onArchive }) {
   const shareText = [
     `doppel — ${PUZZLE_DATE}`,
     `"${PUZZLE_CLUE}"`,
-    win ? (reveals === 0 ? `Perfect, no reveals! 🦄 ${dots}` : `${heading} ${dots}`) : `Gave up 🔴 ${dots}`,
+    win ? (reveals === 0 ? 'Perfect, no reveals! 🦄' : `${heading} ${dots}`) : `Gave up 🔴 ${dots}`,
     IS_ARCHIVE_MODE ? `https://doppel.fyi/?date=${PUZZLE_DATE_ISO}` : 'https://doppel.fyi',
   ].filter(Boolean).join('\n');
 
