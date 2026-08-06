@@ -777,11 +777,12 @@ function ResultModal({ outcome, reveals, streak, onClose, onArchive }) {
           {PUZZLE_DATE} · "{PUZZLE_CLUE}"
         </div>
 
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
           <button onClick={doShare} style={shareBtn}>Share</button>
-          <button onClick={onArchive} style={ghostBtn}>Archive</button>
+          <button onClick={copyToClipboard} style={{ ...ghostBtn, minWidth: 0 }}>{copied ? 'Copied!' : 'Copy'}</button>
           <button onClick={() => setShowStats(true)} style={ghostBtn}>Stats</button>
         </div>
+        <button onClick={onArchive} style={{ ...ghostBtn, flex: 'none', width: '100%' }}>Play the archive</button>
       </div>
       {showStats && <StatsModal onClose={() => setShowStats(false)} />}
     </div>
