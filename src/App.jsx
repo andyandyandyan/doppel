@@ -730,7 +730,7 @@ function ResultModal({ outcome, reveals, streak, onClose, onArchive }) {
   const [copied, setCopied] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const win = outcome === 'win';
-  const heading = win ? (reveals === 0 ? 'Perfect!' : 'Nice!') : 'Better luck next time!';
+  const heading = win ? (reveals === 0 ? 'Perfect!' : reveals === 1 ? 'Excellent!' : reveals <= 4 ? 'Nice!' : 'Phew!') : 'Better luck next time!';
   const dots = '🔵'.repeat(reveals) + '⚪'.repeat(MAX_PICKS - reveals);
 
   const shareText = [
