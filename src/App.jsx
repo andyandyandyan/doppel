@@ -843,6 +843,7 @@ export default function App() {
 
   const slotRefs    = useRef({});
   const psRef       = useRef(null);
+  const [freshReveal, setFreshReveal] = useState(new Set());
 
   const LINES1 = wrapPhrase(p1);
   const LINES2 = wrapPhrase(p2);
@@ -940,15 +941,14 @@ export default function App() {
     setTyped1(td => { const n = { ...td }; for (let i = 0; i < accepted0.length; i++) if (accepted0[i] === ch) delete n[i]; return n; });
     setTyped2(td => { const n = { ...td }; for (let i = 0; i < accepted1.length; i++) if (accepted1[i] === ch) delete n[i]; return n; });
     setPicks(p => p - 1);
-    if (psRef.current) {
-      for (const { pi, i } of newSlots) {
-        const el = slotRefs.current[`${pi}-${i}`];
-        if (!el) continue;
-        const rect = el.getBoundingClientRect();
-        psRef.current.burst(rect.left + rect.width / 2, rect.top + rect.height / 2, {
-          count: 9, speed: 3.5, r: 3.5, colors: SPARK_BLUE, lifetime: 650, star: true,
-        });
-      }
+    const freshKeys = newSlots.map(({ pi, i }) => `${pi}-${i}`);
+    if (freshKeys.length) {
+      setFreshReveal(prev => new Set([...prev, ...freshKeys]));
+      setTimeout(() => setFreshReveal(prev => {
+        const next = new Set(prev);
+        freshKeys.forEach(k => next.delete(k));
+        return next;
+      }), 1200);
     }
   }
 
@@ -1116,9 +1116,10 @@ export default function App() {
                         const isFocused = focused === i;
                         if (isSpace) return <div key={i} style={{ width: SPACE_W, flexShrink: 0 }} />;
                         const borderColor = isGiveUpReveal ? 'var(--text)' : (err && !revealed) ? 'var(--error)' : (revealed || isFocused) ? 'var(--accent)' : 'var(--border)';
+                        const isFresh = freshReveal.has(`${pi}-${i}`);
                         return (
-                          <div key={i} style={{ width: SLOT_W, height: 38, flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: `2px solid ${borderColor}`, transition: 'border-color 0.2s' }}>
-                            {revealed && <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', fontWeight: 500, color: isGiveUpReveal ? 'var(--text)' : 'var(--accent)', userSelect: 'none' }}>{isGiveUpReveal ? ch : (pi === 0 ? accepted0 : accepted1)[i]}</span>}
+                          <div key={i} className={isFresh ? 'tile-reveal' : undefined} style={{ width: SLOT_W, height: 38, flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: `2px solid ${borderColor}`, transition: 'border-color 0.2s' }}>
+                            {revealed && <span className={isFresh && !isGiveUpReveal ? 'letter-reveal' : undefined} style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', fontWeight: 500, color: isGiveUpReveal ? 'var(--text)' : 'var(--accent)', userSelect: 'none' }}>{isGiveUpReveal ? ch : (pi === 0 ? accepted0 : accepted1)[i]}</span>}
                             {!revealed && !gaveUp && (
                               <>
                                 {typed[i] ? <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', fontWeight: 500, color: 'var(--text)', userSelect: 'none', pointerEvents: 'none' }}>{typed[i]}</span>
