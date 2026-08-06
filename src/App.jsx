@@ -731,12 +731,12 @@ function ResultModal({ outcome, reveals, streak, onClose, onArchive }) {
   const [showStats, setShowStats] = useState(false);
   const win = outcome === 'win';
   const heading = win ? (reveals === 0 ? 'Perfect!' : 'Nice!') : 'Better luck next time!';
-  const dots = '🔵'.repeat(reveals);
+  const dots = '🔵'.repeat(reveals) + '⚪'.repeat(MAX_PICKS - reveals);
 
   const shareText = [
     `doppel — ${PUZZLE_DATE}`,
     `"${PUZZLE_CLUE}"`,
-    win ? (reveals === 0 ? 'Perfect, no reveals! 🦄' : `${heading}${dots ? ' ' + dots : ''}`) : `Gave up 🔴${dots ? ' ' + dots : ''}`,
+    win ? (reveals === 0 ? `Perfect, no reveals! 🦄 ${dots}` : `${heading} ${dots}`) : `Gave up 🔴 ${dots}`,
     IS_ARCHIVE_MODE ? `https://doppel.fyi/?date=${PUZZLE_DATE_ISO}` : 'https://doppel.fyi',
   ].filter(Boolean).join('\n');
 
@@ -766,7 +766,7 @@ function ResultModal({ outcome, reveals, streak, onClose, onArchive }) {
         <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.7rem', color: 'var(--dim)', marginBottom: '0.3rem' }}>
           {reveals === 0 ? 'You used no reveals' : `You used ${reveals} reveal${reveals === 1 ? '' : 's'}`}
         </div>
-        {dots && <div style={{ fontSize: '1rem', marginBottom: '0.5rem', letterSpacing: '0.1em' }}>{dots}</div>}
+        <div style={{ fontSize: '1rem', marginBottom: '0.5rem', letterSpacing: '0.1em' }}>{dots}</div>
         {win && !IS_ARCHIVE_MODE && streak > 0 && (
           <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.78rem', fontWeight: 700, color: 'var(--accent)', marginBottom: '0.6rem' }}>
             {streak} day streak 🔥
