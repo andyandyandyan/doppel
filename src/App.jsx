@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Analytics } from '@vercel/analytics/react';
 import puzzleSchedule from '../puzzle.json';
+import FORTUNES from './fortunes.json';
 
 // ─── Puzzle schedule ────────────────────────────────────────────────────────
 // puzzle.json is a list of { date: "YYYY-MM-DD", title, phrase1, phrase2 },
@@ -57,6 +58,7 @@ if (!PUZZLE_ERROR) {
 }
 const MAX_PICKS = 5;
 const HELP_KEY = 'doppel-help-seen';
+const FORTUNE_KEY = `doppel-fortune-${PUZZLE_DATE_ISO}`;
 
 const RESULTS_KEY = 'doppel-results';
 function loadResults() { try { return JSON.parse(localStorage.getItem(RESULTS_KEY) || '{}'); } catch { return {}; } }
@@ -392,6 +394,10 @@ function HelpScreen5({ active }) {
         <MiniPhrase phrase={DP2} getState={g2} />
         <span style={{ ...ck, opacity: win ? 1 : 0 }}>✓</span>
       </div>
+      <p style={{ fontFamily: "'DM Serif Display',serif", fontSize: '1.15rem', color: 'var(--text)', lineHeight: 1.55, marginTop: 18, textAlign: 'center' }}>
+        Use no reveals and you'll earn something special.
+      </p>
+      <FortuneCookie decorative scale={0.7} />
     </div>
   );
 }
@@ -401,7 +407,7 @@ const HELP_TEXT = [
   'This is a doppel.',
   'A doppel is a pair of phrases that have three things in common: character length, at least one letter in the same position, and a theme.',
   "In this game, only the doppel's key characteristics — its length, common letters in identical spots, and clue — are visible. You must guess the rest.",
-  'To do that, you have access to all the letters that appear in either word. Double click to reveal their places, but choose wisely: you only get five. The fewer you use, the more impressive your achievement.',
+  'To do that, you have access to all the letters that appear in either word. Double click to reveal their places, but choose wisely: you only get five.',
   'Correctly guess the doppel to win.',
 ];
 const HELP_COMPS = [HelpScreen1, HelpScreen2, HelpScreen3, HelpScreen4, HelpScreen5];
@@ -535,7 +541,7 @@ function StatsModal({ onClose }) {
   const lbl = { fontFamily: "'DM Mono',monospace", fontSize: '0.68rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--dim)' };
   const val = { fontFamily: "'DM Mono',monospace", fontSize: '1rem', fontWeight: 700, color: 'var(--accent)' };
 
-  const histLabels = ['🦄', '🔵', '🔵🔵', '🔵🔵🔵', '🔵🔵🔵🔵', '🔵🔵🔵🔵🔵'];
+  const histLabels = ['🥠', '🔵', '🔵🔵', '🔵🔵🔵', '🔵🔵🔵🔵', '🔵🔵🔵🔵🔵'];
 
   const HistRow = ({ label, count, last, loss }) => {
     const isText = label === 'Gave up';
@@ -725,6 +731,152 @@ function ArchiveModal({ onClose }) {
   );
 }
 
+// ─── Fortune cookie ───────────────────────────────────────────────────────────
+
+function FortunePaper({ fortune }) {
+  const [open, setOpen] = useState(false);
+  const [showText, setShowText] = useState(false);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    const t1 = setTimeout(() => setOpen(true), 60);
+    const t2 = setTimeout(() => setShowText(true), 500);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+  async function copyFortune() {
+    try { await navigator.clipboard.writeText(fortune); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* unsupported */ }
+  }
+  return (
+    <div style={{
+      alignSelf: 'stretch', background: '#fffef5',
+      border: '1px solid #ddd8c0', borderRadius: 4,
+      padding: '12px 16px', marginBottom: '0.5rem',
+      boxShadow: '0 2px 10px rgba(0,0,0,0.08)',
+      transformOrigin: 'top center',
+      transform: open ? 'scaleY(1)' : 'scaleY(0.04)',
+      transition: 'transform 0.5s cubic-bezier(0.34,1.3,0.64,1)',
+      overflow: 'hidden',
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        opacity: showText ? 1 : 0, transition: 'opacity 0.35s',
+      }}>
+        <span style={{
+          fontFamily: "'DM Serif Display',serif", fontStyle: 'italic',
+          fontSize: '0.85rem', color: '#e85858', lineHeight: 1.5,
+        }}>
+          {fortune}
+        </span>
+        <button onClick={copyFortune} title="Copy fortune" style={{
+          background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0 0',
+          color: copied ? '#e85858' : '#c4b898', flexShrink: 0, lineHeight: 1,
+          transition: 'color 0.2s',
+        }}>
+          {copied
+            ? <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><polyline points="2,8 6,12 14,4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            : <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="5" y="1" width="10" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.5"/><path d="M3 4H2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+          }
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function FortuneCookie({ decorative = false, scale = 1 }) {
+  const saved = !decorative ? localStorage.getItem(FORTUNE_KEY) : null;
+  const [fortune] = useState(() => saved || FORTUNES[Math.floor(Math.random() * FORTUNES.length)]);
+  // idle → fracturing (shake + vertical crack appears) → splitting (halves fly left/right) → open
+  const [phase, setPhase] = useState(() => saved ? 'open' : 'idle');
+
+  function crack() {
+    if (decorative || phase !== 'idle') return;
+    setPhase('fracturing');
+    setTimeout(() => setPhase('splitting'), 200);
+    setTimeout(() => {
+      localStorage.setItem(FORTUNE_KEY, fortune);
+      setPhase('open');
+    }, 620);
+  }
+
+  if (phase === 'open') return <FortunePaper fortune={fortune} />;
+
+  const fracturing = phase === 'fracturing';
+  const splitting = phase === 'splitting';
+  const active = fracturing || splitting;
+
+  // Valley bottom at y=55. Each half's inner edge ends at the valley shoulder
+  // (55,49) or (65,49), then arcs down into the valley bottom (60,55) before
+  // running straight down the center line to (60,76). The stroke traces this
+  // correctly so no V bleeds into the opening.
+  // Valley: cubic beziers with horizontal tangents at the bottom (60,55) on both sides → true U.
+  const L = "M 60,76 C 28,76 10,68 10,58 C 8,46 8,28 14,6 C 40,6 57,28 57,49 C 57,53 59,55 60,55 L 60,76 Z";
+  const R = "M 60,76 L 60,55 C 61,55 63,53 63,49 C 63,28 80,6 106,6 C 112,28 112,46 110,58 C 110,68 92,76 60,76 Z";
+
+  return (
+    <div
+      onClick={crack}
+      className={fracturing ? 'cookie-fracture' : undefined}
+      style={{ cursor: (!decorative && phase === 'idle') ? 'pointer' : 'default', userSelect: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, marginBottom: '0.4rem', transform: scale !== 1 ? `scale(${scale})` : undefined, transformOrigin: 'top center' }}
+    >
+      <svg width={120} height={86} viewBox="0 0 120 86" style={{ overflow: 'visible' }}>
+        {/* Ground shadow — stays stationary */}
+        <ellipse cx="60" cy="82" rx="42" ry="3" fill="rgba(0,0,0,0.07)" opacity={splitting ? 0 : 1} style={{ transition: 'opacity 0.2s' }} />
+
+        {/* Cookie body — wobbles independently of shadow and label */}
+        <g className={phase === 'idle' ? 'cookie-wobble' : undefined} style={{ transformOrigin: '60px 76px' }}>
+
+        {/* Left half — flies left on split */}
+        <g style={{
+          transformOrigin: '60px 62px',
+          transform: splitting ? 'translateX(-38px) rotate(-26deg)' : 'none',
+          opacity: splitting ? 0 : 1,
+          transition: splitting ? 'transform 0.4s cubic-bezier(0.6,0,1,1), opacity 0.32s 0.08s' : 'none',
+        }}>
+          <path d={L} fill="#e8c46a" stroke="#c4922e" strokeWidth="0.9" />
+          <path d="M 10,60 C 8,46 8,28 18,8" fill="none" stroke="rgba(255,255,255,0.52)" strokeWidth="2.5" strokeLinecap="round" />
+          <path d="M 14,6 C 40,6 57,28 57,49" fill="none" stroke="#b8862a" strokeWidth="1.1" opacity={fracturing ? 0 : 0.6} style={{ transition: 'opacity 0.08s' }} />
+          <path d="M 57,49 C 57,53 59,55 60,55" fill="none" stroke="#b8862a" strokeWidth="1.1" strokeLinecap="round" opacity={fracturing ? 0 : 0.6} style={{ transition: 'opacity 0.08s' }} />
+        </g>
+
+        {/* Right half — flies right on split */}
+        <g style={{
+          transformOrigin: '60px 62px',
+          transform: splitting ? 'translateX(38px) rotate(26deg)' : 'none',
+          opacity: splitting ? 0 : 1,
+          transition: splitting ? 'transform 0.4s cubic-bezier(0.6,0,1,1), opacity 0.32s 0.08s' : 'none',
+        }}>
+          <path d={R} fill="#d4a843" stroke="#b88030" strokeWidth="0.9" />
+          <path d="M 110,60 C 112,46 112,28 102,8" fill="none" stroke="rgba(255,255,255,0.32)" strokeWidth="2.5" strokeLinecap="round" />
+          <path d="M 60,55 C 61,55 63,53 63,49" fill="none" stroke="#b8862a" strokeWidth="1.1" strokeLinecap="round" opacity={fracturing ? 0 : 0.6} style={{ transition: 'opacity 0.08s' }} />
+          <path d="M 63,49 C 63,28 80,6 106,6" fill="none" stroke="#b8862a" strokeWidth="1.1" opacity={fracturing ? 0 : 0.6} style={{ transition: 'opacity 0.08s' }} />
+        </g>
+
+        {/* Interior opening drawn after halves — covers any stroke fringe at the valley */}
+        <path
+          d="M 14,6 C 40,6 57,28 57,49 C 57,53 59,55 60,55 C 61,55 63,53 63,49 C 63,28 80,6 106,6 Z"
+          fill="#f5e898" opacity={splitting ? 0 : 0.38}
+          style={{ transition: 'opacity 0.2s' }}
+        />
+
+        {/* Vertical crack — jagged, only during fracturing */}
+        <path
+          d="M 60,55 L 57,62 L 63,68 L 57,73 L 60,76"
+          fill="none" stroke="#6b2a00" strokeWidth="1.8"
+          strokeLinecap="round" strokeLinejoin="round"
+          opacity={fracturing ? 0.88 : 0}
+          style={{ transition: 'opacity 0.06s' }}
+        />
+
+        </g>{/* end cookie-wobble group */}
+      </svg>
+      {!decorative && <span style={{
+        fontFamily: "'DM Mono',monospace", fontSize: '0.52rem', letterSpacing: '0.1em',
+        color: 'var(--dim)', textTransform: 'uppercase',
+        opacity: active ? 0 : 0.75, transition: 'opacity 0.12s',
+      }}>tap to open</span>}
+    </div>
+  );
+}
+
 // ─── Result modal ──────────────────────────────────────────────────────────────
 function ResultModal({ outcome, reveals, streak, onClose, onArchive }) {
   const [copied, setCopied] = useState(false);
@@ -736,7 +888,7 @@ function ResultModal({ outcome, reveals, streak, onClose, onArchive }) {
   const shareText = [
     `doppel — ${PUZZLE_DATE}`,
     `"${PUZZLE_CLUE}"`,
-    win ? (reveals === 0 ? 'Perfect, no reveals! 🦄' : `${heading} ${dots}`) : `Gave up 🔴 ${dots}`,
+    win ? (reveals === 0 ? '🥠 Perfect, I got a fortune cookie! Can you?' : `${heading} ${dots}`) : `Gave up 🔴 ${dots}`,
     IS_ARCHIVE_MODE ? `https://doppel.fyi/?date=${PUZZLE_DATE_ISO}` : 'https://doppel.fyi',
   ].filter(Boolean).join('\n');
 
@@ -759,9 +911,10 @@ function ResultModal({ outcome, reveals, streak, onClose, onArchive }) {
       <div style={{ position: 'relative', background: 'var(--bg)', borderRadius: 10, maxWidth: 340, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', padding: '1.8rem 1.6rem', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
         <button onClick={onClose} style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--dim)', fontSize: '1.2rem', lineHeight: 1, padding: 0 }}>×</button>
 
-        {win && reveals === 0 && <div style={{ fontSize: '2.2rem', marginBottom: '0.2rem' }}>🦄</div>}
         {!win && <div style={{ fontSize: '2.2rem', marginBottom: '0.2rem' }}>🔴</div>}
         <div style={{ fontFamily: "'DM Serif Display',serif", fontStyle: 'italic', fontSize: '1.6rem', color: 'var(--accent)', marginBottom: '0.6rem' }}>{heading}</div>
+
+        {win && reveals === 0 && <FortuneCookie />}
 
         <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.7rem', color: 'var(--dim)', marginBottom: '0.3rem' }}>
           {reveals === 0 ? 'You used no reveals' : `You used ${reveals} reveal${reveals === 1 ? '' : 's'}`}
