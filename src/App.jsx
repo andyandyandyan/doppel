@@ -64,7 +64,11 @@ const RESULTS_KEY = 'doppel-results';
 function loadResults() { try { return JSON.parse(localStorage.getItem(RESULTS_KEY) || '{}'); } catch { return {}; } }
 const PROGRESS_KEY = 'doppel-progress';
 function clearProgress() { localStorage.removeItem(PROGRESS_KEY); }
-function saveResult(dateISO, outcome, reveals) { const r = loadResults(); r[dateISO] = { outcome, reveals, ...(IS_ARCHIVE_MODE ? { archive: true } : {}) }; localStorage.setItem(RESULTS_KEY, JSON.stringify(r)); clearProgress(); }
+function saveResult(dateISO, outcome, reveals, hardMode) { const r = loadResults(); r[dateISO] = { outcome, reveals, hardMode: !!hardMode, ...(IS_ARCHIVE_MODE ? { archive: true } : {}) }; localStorage.setItem(RESULTS_KEY, JSON.stringify(r)); clearProgress(); }
+// Whichever hard-mode setting a player last completed a puzzle with becomes their default going forward.
+const HARD_MODE_KEY = 'doppel-hardmode-default';
+function loadHardModeDefault() { return localStorage.getItem(HARD_MODE_KEY) === '1'; }
+function saveHardModeDefault(v) { localStorage.setItem(HARD_MODE_KEY, v ? '1' : '0'); }
 // Both phrases have spaces at identical indices → either answer is valid in either slot with no reveals used.
 const SPACES_MIRROR = !PUZZLE_ERROR && (() => { const { p1, p2 } = PUZZLE; for (let i = 0; i < p1.length; i++) if ((p1[i] === ' ') !== (p2[i] === ' ')) return false; return true; })();
 const PREV_RESULT = !PUZZLE_ERROR ? (loadResults()[PUZZLE_DATE_ISO] || null) : null;
@@ -505,6 +509,9 @@ function getPool(p1, p2) {
     .sort((a, b) => a.localeCompare(b));
 }
 
+// Hard mode: the full alphabet, so decoy letters that appear in neither phrase are mixed in.
+const ALPHABET = Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i));
+
 function allInstancesRevealed(ch, p1, p2, rev1, rev2) {
   for (let i = 0; i < p1.length; i++) if (p1[i] === ch && !rev1.has(i)) return false;
   for (let i = 0; i < p2.length; i++) if (p2[i] === ch && !rev2.has(i)) return false;
@@ -878,7 +885,7 @@ function FortuneCookie({ decorative = false, scale = 1 }) {
 }
 
 // ─── Result modal ──────────────────────────────────────────────────────────────
-function ResultModal({ outcome, reveals, streak, onClose, onArchive }) {
+function ResultModal({ outcome, reveals, streak, hardMode, onClose, onArchive }) {
   const [copied, setCopied] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const win = outcome === 'win';
@@ -886,7 +893,7 @@ function ResultModal({ outcome, reveals, streak, onClose, onArchive }) {
   const dots = '🔵'.repeat(reveals) + '⚪'.repeat(MAX_PICKS - reveals);
 
   const shareText = [
-    `doppel — ${PUZZLE_DATE}`,
+    `doppel — ${PUZZLE_DATE}${hardMode ? '*' : ''}`,
     `"${PUZZLE_CLUE}"`,
     win ? (reveals === 0 ? '🥠 Perfect, I got a fortune cookie! Can you?' : `${heading} ${dots}`) : `Gave up 🔴 ${dots}`,
     IS_ARCHIVE_MODE ? `https://doppel.fyi/?date=${PUZZLE_DATE_ISO}` : 'https://doppel.fyi',
@@ -949,7 +956,20 @@ export default function App() {
   const isAlreadyPlayed = !!PREV_RESULT;
   const sp = SAVED_PROGRESS;
 
-  const [pool, setPool] = useState(() => sp?.pool ?? getPool(p1, p2));
+  const [hardMode, setHardMode] = useState(() => {
+    if (isAlreadyPlayed) return !!PREV_RESULT.hardMode;
+    if (sp) return !!sp.hardMode;
+    return loadHardModeDefault();
+  });
+  // Locks the hard-mode toggle for the day once the player has revealed a tile or submitted a guess.
+  const [hasInteracted, setHasInteracted] = useState(() => {
+    if (isAlreadyPlayed) return true;
+    if (!sp) return false;
+    if (sp.hasInteracted) return true;
+    // Fall back for progress saved before hard mode existed.
+    return (sp.picksLeft ?? MAX_PICKS) < MAX_PICKS || Object.keys(sp.typed1 || {}).length > 0 || Object.keys(sp.typed2 || {}).length > 0;
+  });
+  const [pool, setPool] = useState(() => sp?.pool ?? (hardMode ? [...ALPHABET] : getPool(p1, p2)));
   const [rev1, setRev1] = useState(() => {
     if (isAlreadyPlayed) return new Set(Array.from({ length: p1.length }, (_, i) => i));
     if (sp) return new Set(sp.rev1);
@@ -974,6 +994,7 @@ export default function App() {
   const [err1,      setErr1]  = useState(false);
   const [err2,      setErr2]  = useState(false);
   const [pendingTile, setPendingTile] = useState(null);
+  const [triedLetters, setTriedLetters] = useState(() => new Set(sp?.triedLetters ?? []));
   const [gaveUp,    setGaveUp]   = useState(isAlreadyPlayed && PREV_RESULT.outcome === 'lose');
   const [giveUpRev1, setGiveUpRev1] = useState(new Set());
   const [giveUpRev2, setGiveUpRev2] = useState(new Set());
@@ -1027,8 +1048,9 @@ export default function App() {
       typed1, typed2,
       picksLeft, won1, won2,
       pool, accepted0, accepted1,
+      hardMode, hasInteracted, triedLetters: [...triedLetters],
     });
-  }, [rev1, rev2, typed1, typed2, picksLeft, won1, won2, gaveUp, pool, accepted0, accepted1]);
+  }, [rev1, rev2, typed1, typed2, picksLeft, won1, won2, gaveUp, pool, accepted0, accepted1, hardMode, hasInteracted, triedLetters]);
 
   function handleGiveUp() {
     setGaveUp(true);
@@ -1040,7 +1062,8 @@ export default function App() {
     const p2Start = START + pending1.length * STEP + GAP;
     pending2.forEach((idx, k) => setTimeout(() => setGiveUpRev2(s => new Set([...s, idx])), p2Start + k * STEP));
     const total = p2Start + pending2.length * STEP + 700;
-    saveResult(PUZZLE_DATE_ISO, 'lose', MAX_PICKS - picksLeft);
+    saveResult(PUZZLE_DATE_ISO, 'lose', MAX_PICKS - picksLeft, hardMode);
+    saveHardModeDefault(hardMode);
     setTimeout(() => setShowResult(true), total);
   }
 
@@ -1078,31 +1101,67 @@ export default function App() {
   }
 
   // ── Reveal / guess handlers ──────────────────────────────────────────────
+  function tileDone(ch) {
+    if (gaveUp) return true;
+    // Decoy letters (hard mode only, not in either phrase) are never "fully revealed" —
+    // they just sit there as a trap, and stay clickable until picks run out.
+    if (!p1.includes(ch) && !p2.includes(ch)) return picksLeft <= 0;
+    const fullyRevealed = allInstancesRevealed(ch, accepted0, accepted1, rev1, rev2);
+    if (!fullyRevealed) return false;
+    // In hard mode, a letter that's only fully revealed via pre-revealed common positions
+    // (never actually picked by the player) must not grey out before it's tried — otherwise
+    // the rack would give away which of the 26 tiles are real before you click anything.
+    if (hardMode && !triedLetters.has(ch)) return false;
+    return true;
+  }
+
+  function toggleHardMode() {
+    if (hasInteracted) return;
+    setHardMode(prev => {
+      const next = !prev;
+      setPool(next ? [...ALPHABET] : getPool(p1, p2));
+      return next;
+    });
+  }
+
   function handleTileClick(ch) {
-    if (gaveUp || allInstancesRevealed(ch, accepted0, accepted1, rev1, rev2)) return;
+    if (tileDone(ch)) return;
     if (pendingTile === ch) { handleReveal(ch); setPendingTile(null); }
     else { setPendingTile(ch); }
   }
 
   function handleReveal(ch) {
-    if (picksLeft <= 0 || allInstancesRevealed(ch, accepted0, accepted1, rev1, rev2)) return;
-    const nr1 = new Set(rev1), nr2 = new Set(rev2);
-    const newSlots = [];
-    for (let i = 0; i < accepted0.length; i++) if (accepted0[i] === ch) { if (!rev1.has(i)) newSlots.push({ pi: 0, i }); nr1.add(i); }
-    for (let i = 0; i < accepted1.length; i++) if (accepted1[i] === ch) { if (!rev2.has(i)) newSlots.push({ pi: 1, i }); nr2.add(i); }
-    setRev1(nr1); setRev2(nr2);
-    setTyped1(td => { const n = { ...td }; for (let i = 0; i < accepted0.length; i++) if (accepted0[i] === ch) delete n[i]; return n; });
-    setTyped2(td => { const n = { ...td }; for (let i = 0; i < accepted1.length; i++) if (accepted1[i] === ch) delete n[i]; return n; });
-    setPicks(p => p - 1);
-    const freshKeys = newSlots.map(({ pi, i }) => `${pi}-${i}`);
-    if (freshKeys.length) {
-      setFreshReveal(prev => new Set([...prev, ...freshKeys]));
-      setTimeout(() => setFreshReveal(prev => {
-        const next = new Set(prev);
-        freshKeys.forEach(k => next.delete(k));
-        return next;
-      }), 1200);
+    if (tileDone(ch) || picksLeft <= 0) return;
+    if (!hasInteracted) setHasInteracted(true);
+    if (!triedLetters.has(ch)) setTriedLetters(prev => new Set([...prev, ch]));
+
+    const inPhrase = p1.includes(ch) || p2.includes(ch);
+    if (inPhrase) {
+      const nr1 = new Set(rev1), nr2 = new Set(rev2);
+      const newSlots = [];
+      for (let i = 0; i < accepted0.length; i++) if (accepted0[i] === ch) { if (!rev1.has(i)) newSlots.push({ pi: 0, i }); nr1.add(i); }
+      for (let i = 0; i < accepted1.length; i++) if (accepted1[i] === ch) { if (!rev2.has(i)) newSlots.push({ pi: 1, i }); nr2.add(i); }
+      if (newSlots.length > 0) {
+        setRev1(nr1); setRev2(nr2);
+        setTyped1(td => { const n = { ...td }; for (let i = 0; i < accepted0.length; i++) if (accepted0[i] === ch) delete n[i]; return n; });
+        setTyped2(td => { const n = { ...td }; for (let i = 0; i < accepted1.length; i++) if (accepted1[i] === ch) delete n[i]; return n; });
+        setPicks(p => p - 1);
+        const freshKeys = newSlots.map(({ pi, i }) => `${pi}-${i}`);
+        setFreshReveal(prev => new Set([...prev, ...freshKeys]));
+        setTimeout(() => setFreshReveal(prev => {
+          const next = new Set(prev);
+          freshKeys.forEach(k => next.delete(k));
+          return next;
+        }), 1200);
+        return;
+      }
     }
+
+    // A decoy (in neither phrase), or a real letter that was already fully revealed before
+    // this click (e.g. only via pre-revealed common positions) — either way, a wasted pick.
+    setPicks(p => p - 1);
+    setErr1(true); setErr2(true);
+    setTimeout(() => { setErr1(false); setErr2(false); }, 1000);
   }
 
   function getNextTypeable(pi, from) {
@@ -1141,6 +1200,7 @@ export default function App() {
   }
 
   function submitGuess(pi) {
+    if (!hasInteracted) setHasInteracted(true);
     // Use accepted phrases so after a swap the other slot accepts its new "correct" answer
     const phrase = pi === 0 ? accepted0 : accepted1;
     const altPhrase = pi === 0 ? accepted1 : accepted0;
@@ -1158,7 +1218,10 @@ export default function App() {
       const setRev = pi === 0 ? setRev1 : setRev2;
       setRev(allIdx);
       const otherWon = pi === 0 ? won2 : won1;
-      if (otherWon && !isAlreadyPlayed) saveResult(PUZZLE_DATE_ISO, 'win', MAX_PICKS - picksLeft);
+      if (otherWon && !isAlreadyPlayed) {
+        saveResult(PUZZLE_DATE_ISO, 'win', MAX_PICKS - picksLeft, hardMode);
+        saveHardModeDefault(hardMode);
+      }
       if (pi === 0) setWon1(true); else setWon2(true);
       if (psRef.current) {
         phrase.split('').forEach((ch, i) => {
@@ -1236,6 +1299,26 @@ export default function App() {
           ))}
         </div>
       </div>
+
+      {!isAlreadyPlayed && !gaveUp && !(won1 && won2) && (
+        <button
+          onClick={toggleHardMode}
+          disabled={hasInteracted}
+          title={hasInteracted ? "Locked for today — hard mode can't be changed once you start playing" : 'All 26 letters appear as tiles — some are decoys'}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            background: 'none', border: '1px solid var(--border)', borderRadius: 20,
+            padding: '0.3rem 0.5rem 0.3rem 0.7rem',
+            cursor: hasInteracted ? 'default' : 'pointer',
+            opacity: hasInteracted ? 0.55 : 1,
+          }}
+        >
+          <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text)' }}>Hard Mode</span>
+          <span style={{ width: 30, height: 16, borderRadius: 8, background: hardMode ? 'var(--accent)' : 'var(--border-dim)', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+            <span style={{ position: 'absolute', top: 2, left: hardMode ? 16 : 2, width: 12, height: 12, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.25)' }} />
+          </span>
+        </button>
+      )}
 
       {IS_ARCHIVE_MODE && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1327,7 +1410,7 @@ export default function App() {
         <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.68rem', letterSpacing: '0.1em', color: 'var(--text)', textTransform: 'uppercase', textAlign: 'center', opacity: 0.65 }}>Double click a tile to reveal</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', maxWidth: 520 }}>
           {pool.map((ch, i) => {
-            const done = gaveUp || allInstancesRevealed(ch, accepted0, accepted1, rev1, rev2);
+            const done = tileDone(ch);
             return (
               <div key={ch}
                 onClick={() => handleTileClick(ch)}
@@ -1352,6 +1435,7 @@ export default function App() {
           outcome={gaveUp ? 'lose' : 'win'}
           reveals={MAX_PICKS - picksLeft}
           streak={streak}
+          hardMode={hardMode}
           onClose={() => setShowResult(false)}
           onArchive={() => { setShowResult(false); setShowArchive(true); }}
         />
