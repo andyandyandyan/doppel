@@ -884,6 +884,18 @@ function FortuneCookie({ decorative = false, scale = 1 }) {
   );
 }
 
+// ─── Small info popup ────────────────────────────────────────────────────────
+function InfoPopup({ text, onClose }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.38)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: '1rem' }} onClick={onClose}>
+      <div style={{ position: 'relative', background: 'var(--bg)', borderRadius: 10, maxWidth: 300, width: '100%', boxShadow: '0 8px 40px rgba(0,0,0,0.18)', padding: '1.4rem 1.6rem' }} onClick={e => e.stopPropagation()}>
+        <button onClick={onClose} style={{ position: 'absolute', top: 10, right: 10, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--dim)', fontSize: '1.2rem', lineHeight: 1, padding: 0 }}>×</button>
+        <div style={{ fontFamily: "'DM Serif Display',serif", fontSize: '1rem', color: 'var(--text)', lineHeight: 1.55 }}>{text}</div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Result modal ──────────────────────────────────────────────────────────────
 function ResultModal({ outcome, reveals, streak, hardMode, onClose, onArchive }) {
   const [copied, setCopied] = useState(false);
@@ -1001,6 +1013,7 @@ export default function App() {
   const [showResult, setShowResult] = useState(isAlreadyPlayed);
   const [showArchive, setShowArchive] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const [showHardModeInfo, setShowHardModeInfo] = useState(false);
   const streak = !IS_ARCHIVE_MODE ? calcStreak(loadResults()) : 0;
 
   // Help — skip for archive visits, already-finished puzzles, and mid-game refreshes
@@ -1301,23 +1314,32 @@ export default function App() {
       </div>
 
       {!isAlreadyPlayed && !gaveUp && !(won1 && won2) && (
-        <button
-          onClick={toggleHardMode}
-          disabled={hasInteracted}
-          title={hasInteracted ? "Locked for today — hard mode can't be changed once you start playing" : 'All 26 letters appear as tiles — some are decoys'}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            background: 'none', border: '1px solid var(--border)', borderRadius: 20,
-            padding: '0.3rem 0.5rem 0.3rem 0.7rem',
-            cursor: hasInteracted ? 'default' : 'pointer',
-            opacity: hasInteracted ? 0.55 : 1,
-          }}
-        >
-          <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text)' }}>Hard Mode</span>
-          <span style={{ width: 30, height: 16, borderRadius: 8, background: hardMode ? 'var(--accent)' : 'var(--border-dim)', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
-            <span style={{ position: 'absolute', top: 2, left: hardMode ? 16 : 2, width: 12, height: 12, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.25)' }} />
-          </span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button
+            onClick={toggleHardMode}
+            disabled={hasInteracted}
+            title={hasInteracted ? "Locked for today — hard mode can't be changed once you start playing" : 'All 26 letters appear as tiles — some are decoys'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: 'none', border: '1px solid var(--border)', borderRadius: 20,
+              padding: '0.3rem 0.5rem 0.3rem 0.7rem',
+              cursor: hasInteracted ? 'default' : 'pointer',
+              opacity: hasInteracted ? 0.55 : 1,
+            }}
+          >
+            <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.6rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text)' }}>Hard Mode</span>
+            <span style={{ width: 30, height: 16, borderRadius: 8, background: hardMode ? 'var(--accent)' : 'var(--border-dim)', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+              <span style={{ position: 'absolute', top: 2, left: hardMode ? 16 : 2, width: 12, height: 12, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.25)' }} />
+            </span>
+          </button>
+          <button onClick={() => setShowHardModeInfo(true)} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: '50%', width: 18, height: 18, cursor: 'pointer', fontSize: '0.55rem', color: 'var(--dim)', fontFamily: "'DM Mono',monospace", display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, flexShrink: 0 }}>?</button>
+        </div>
+      )}
+      {showHardModeInfo && (
+        <InfoPopup
+          text="In hard mode, all 26 letters appear as tiles — whether they appear in the doppel or not."
+          onClose={() => setShowHardModeInfo(false)}
+        />
       )}
 
       {IS_ARCHIVE_MODE && (
