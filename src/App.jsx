@@ -41,6 +41,7 @@ const SCHEDULE_EMPTY = !Array.isArray(puzzleSchedule) || puzzleSchedule.length =
 const BAD_ENTRIES = SCHEDULE_EMPTY ? [] : puzzleSchedule.filter(e => e.phrase1.trim().length !== e.phrase2.trim().length);
 const PUZZLE_ERROR = SCHEDULE_EMPTY || BAD_ENTRIES.length > 0;
 
+const LAST_ARCHIVE_KEY = 'doppel-archive-last-date';
 let PUZZLE = { p1: '', p2: '' }, PUZZLE_DATE = '', PUZZLE_DATE_ISO = '', PUZZLE_CLUE = '';
 let ARCHIVE_ENTRIES = [], IS_ARCHIVE_MODE = false;
 if (!PUZZLE_ERROR) {
@@ -55,10 +56,14 @@ if (!PUZZLE_ERROR) {
   PUZZLE_DATE_ISO = selected.date;
   PUZZLE_CLUE = selected.title;
   ARCHIVE_ENTRIES = sorted.filter(e => e.date < today).reverse(); // most recent first
+  // Remember the last archive puzzle visited this session, so reopening the calendar
+  // later returns to that month instead of resetting to the most recent one.
+  if (IS_ARCHIVE_MODE && typeof sessionStorage !== 'undefined') sessionStorage.setItem(LAST_ARCHIVE_KEY, PUZZLE_DATE_ISO);
 }
 const MAX_PICKS = 5;
 const HELP_KEY = 'doppel-help-seen';
 const FORTUNE_KEY = `doppel-fortune-${PUZZLE_DATE_ISO}`;
+const INTRO_KEY = `doppel-intro-seen-${PUZZLE_DATE_ISO}`;
 
 const RESULTS_KEY = 'doppel-results';
 function loadResults() { try { return JSON.parse(localStorage.getItem(RESULTS_KEY) || '{}'); } catch { return {}; } }
@@ -532,6 +537,155 @@ function wrapPhrase(phrase) {
   return lines;
 }
 
+// ─── Intro animation ──────────────────────────────────────────────────────────
+// Plays once per puzzle day: a single merged row rolls out, holds, then splits into
+// the two real phrase rows in their actual starting state (word-wrapped per phrase,
+// pre-revealed common letters shown) — then a very brief settle before fading away
+// to reveal the real, now-interactive board underneath.
+// Every position in the merged row — including spaces — renders as an underscored
+// slot: the merged row is boiling both halves down to one common, not-yet-resolved
+// form, and most days one phrase's space is the other phrase's still-unrevealed
+// letter. Only positions that are a genuinely shared letter show that letter as they
+// roll in. The merged row's line breaks are fixed-width, not word-wrapped — wrapping
+// it to either phrase's word lengths would silently drop positions where one phrase's
+// word-break space lands on the other phrase's real letter.
+const INTRO_SLOT_W = 22, INTRO_GAP = 2, INTRO_NUM_W = 26, INTRO_LINE_LEN = 12;
+
+function chunkIndices(length, size) {
+  const lines = [];
+  for (let start = 0; start < length; start += size) lines.push({ start, len: Math.min(size, length - start) });
+  return lines;
+}
+
+function IntroNum({ n }) {
+  return (
+    <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--accent)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 700, flexShrink: 0, fontFamily: "'DM Mono',monospace", marginRight: 6, alignSelf: 'flex-end', marginBottom: 4 }}>{n}</div>
+  );
+}
+
+function IntroOverlay({ p1, p2, onDone }) {
+  const [phase, setPhase] = useState('merged'); // 'merged' → 'split' → 'fading'
+  const [shown, setShown] = useState(new Set());
+
+  const mergedIndices = Array.from({ length: p1.length }, (_, i) => i);
+  const mergedLines = chunkIndices(p1.length, INTRO_LINE_LEN);
+  const common = getCommon(p1, p2);
+
+  const lines1 = wrapPhrase(p1);
+  const lines2 = wrapPhrase(p2);
+  const rev1 = new Set(common); for (let i = 0; i < p1.length; i++) if (p1[i] === ' ') rev1.add(i);
+  const rev2 = new Set(common); for (let i = 0; i < p2.length; i++) if (p2[i] === ' ') rev2.add(i);
+
+  useEffect(() => {
+    const STEP = 75, START = 250, HOLD = 450, SPLIT_MS = 850, SETTLE_HOLD = 150, FADE_MS = 250;
+    const ts = [];
+    mergedIndices.forEach((idx, k) => ts.push(setTimeout(() => setShown(s => new Set([...s, idx])), START + k * STEP)));
+    const splitAt = START + mergedIndices.length * STEP + HOLD;
+    ts.push(setTimeout(() => setPhase('split'), splitAt));
+    const fadeAt = splitAt + SPLIT_MS + SETTLE_HOLD;
+    ts.push(setTimeout(() => setPhase('fading'), fadeAt));
+    ts.push(setTimeout(onDone, fadeAt + FADE_MS));
+    return () => ts.forEach(clearTimeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function renderMergedLine(line) {
+    return (
+      <div style={{ display: 'flex', gap: INTRO_GAP, alignItems: 'flex-end' }}>
+        {Array.from({ length: line.len }, (_, j) => {
+          const i = line.start + j;
+          const visible = shown.has(i);
+          const letter = (common.has(i) && p1[i] !== ' ') ? p1[i] : null;
+          return (
+            <div key={i} style={{
+              width: INTRO_SLOT_W, height: 38, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              borderBottom: `2px solid ${letter ? 'var(--accent)' : 'var(--border)'}`,
+              opacity: visible ? 1 : 0,
+              transform: visible ? 'translateY(0)' : 'translateY(6px)',
+              transition: 'opacity 0.25s ease, transform 0.25s ease',
+            }}>
+              {letter && <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', fontWeight: 500, color: 'var(--accent)' }}>{letter}</span>}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  function renderRealLine(phrase, rev, line) {
+    return (
+      <div style={{ display: 'flex', gap: INTRO_GAP, alignItems: 'flex-end' }}>
+        {line.text.split('').map((ch, j) => {
+          const i = line.start + j;
+          if (ch === ' ') return <div key={i} style={{ width: INTRO_SLOT_W, flexShrink: 0 }} />;
+          const revealed = rev.has(i);
+          return (
+            <div key={i} style={{ width: INTRO_SLOT_W, height: 38, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: `2px solid ${revealed ? 'var(--accent)' : 'var(--border)'}` }}>
+              {revealed && <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', fontWeight: 500, color: 'var(--accent)' }}>{phrase[i]}</span>}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  const merged = phase === 'merged';
+  const split = phase === 'split' || phase === 'fading';
+  const fading = phase === 'fading';
+
+  return (
+    <div onClick={onDone} style={{ opacity: fading ? 0 : 1, transition: 'opacity 0.25s ease', cursor: 'pointer' }}>
+      <div style={{ position: 'relative', display: 'flex', flexDirection: 'column' }}>
+
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: merged ? 1 : 0, pointerEvents: 'none' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {mergedLines.map((line, li) => (
+              <div key={li} style={{ display: 'flex', alignItems: 'flex-end' }}>
+                <div style={{ width: INTRO_NUM_W, flexShrink: 0 }} />
+                {renderMergedLine(line)}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Opacity snaps on instantly the moment the break happens — both halves are fully
+            solid from frame one — while the translateY keeps animating smoothly, so what's
+            visible is two already-solid halves physically gliding apart, not a fade-in. */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          <div style={{
+            display: 'flex', flexDirection: 'column', gap: 8,
+            opacity: split ? 1 : 0,
+            transform: split ? 'translateY(0)' : 'translateY(26px)',
+            transition: 'transform 0.85s ease',
+          }}>
+            {lines1.map((line, li) => (
+              <div key={li} style={{ display: 'flex', alignItems: 'flex-end' }}>
+                {li === 0 ? <IntroNum n={1} /> : <div style={{ width: INTRO_NUM_W, flexShrink: 0 }} />}
+                {renderRealLine(p1, rev1, line)}
+              </div>
+            ))}
+          </div>
+          <div style={{
+            display: 'flex', flexDirection: 'column', gap: 8,
+            opacity: split ? 1 : 0,
+            transform: split ? 'translateY(0)' : 'translateY(-26px)',
+            transition: 'transform 0.85s ease',
+          }}>
+            {lines2.map((line, li) => (
+              <div key={li} style={{ display: 'flex', alignItems: 'flex-end' }}>
+                {li === 0 ? <IntroNum n={2} /> : <div style={{ width: INTRO_NUM_W, flexShrink: 0 }} />}
+                {renderRealLine(p2, rev2, line)}
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
 // ─── Stats modal ──────────────────────────────────────────────────────────────
 function StatsModal({ onClose }) {
   const results = loadResults();
@@ -585,7 +739,9 @@ function ArchiveModal({ onClose }) {
   const puzzleByDate = {};
   ARCHIVE_ENTRIES.forEach(e => { puzzleByDate[e.date] = e; });
 
-  const seed = ARCHIVE_ENTRIES.length > 0 ? parseLocalDate(ARCHIVE_ENTRIES[0].date) : parseLocalDate(todayISO());
+  const lastArchiveDate = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(LAST_ARCHIVE_KEY) : null;
+  const seed = lastArchiveDate ? parseLocalDate(lastArchiveDate)
+    : ARCHIVE_ENTRIES.length > 0 ? parseLocalDate(ARCHIVE_ENTRIES[0].date) : parseLocalDate(todayISO());
   const [viewYear,  setViewYear]  = useState(seed.getFullYear());
   const [viewMonth, setViewMonth] = useState(seed.getMonth());
 
@@ -1017,6 +1173,12 @@ export default function App() {
   const streak = !IS_ARCHIVE_MODE ? calcStreak(loadResults()) : 0;
 
   // Help — skip for archive visits, already-finished puzzles, and mid-game refreshes
+  const [showIntro, setShowIntro] = useState(() => {
+    if (IS_ARCHIVE_MODE || isAlreadyPlayed || localStorage.getItem(INTRO_KEY)) return false;
+    // Don't replay over a game already in progress (e.g. started before this feature existed).
+    if (sp && (sp.hasInteracted || (sp.picksLeft ?? MAX_PICKS) < MAX_PICKS || Object.keys(sp.typed1 || {}).length > 0 || Object.keys(sp.typed2 || {}).length > 0)) return false;
+    return true;
+  });
   const [showHelp, setShowHelp] = useState(() => !localStorage.getItem(HELP_KEY) && !IS_ARCHIVE_MODE && !isAlreadyPlayed && !sp);
   const [helpPage, setHelpPage] = useState(0);
   const [dontShow, setDontShow] = useState(false);
@@ -1117,8 +1279,9 @@ export default function App() {
   function tileDone(ch) {
     if (gaveUp) return true;
     // Decoy letters (hard mode only, not in either phrase) are never "fully revealed" —
-    // they just sit there as a trap, and stay clickable until picks run out.
-    if (!p1.includes(ch) && !p2.includes(ch)) return picksLeft <= 0;
+    // they just sit there as a trap. Once tried once (costing a pick), further clicks on
+    // that same tile are free — it locks instead of charging another pick every time.
+    if (!p1.includes(ch) && !p2.includes(ch)) return triedLetters.has(ch) || picksLeft <= 0;
     const fullyRevealed = allInstancesRevealed(ch, accepted0, accepted1, rev1, rev2);
     if (!fullyRevealed) return false;
     // In hard mode, a letter that's only fully revealed via pre-revealed common positions
@@ -1274,6 +1437,8 @@ export default function App() {
   const navBtn = { background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'DM Mono',monospace", fontSize: '2.4rem', color: 'var(--accent)', padding: '0.25rem 0.5rem' };
   const CW = cardWidth || 340;
   const PAD = 24; // 1.5rem card padding
+  // Wait for the how-to-play card to close before the intro plays, so new players read it first.
+  const playIntro = showIntro && !showHelp;
 
   if (PUZZLE_ERROR) {
     return (
@@ -1354,6 +1519,13 @@ export default function App() {
         {streak > 0 && <button onClick={() => setShowStats(true)} style={{ marginTop: '0.4rem', fontFamily: "'DM Mono',monospace", fontSize: '0.62rem', letterSpacing: '0.08em', color: 'var(--dim)', background: 'none', border: '1px solid var(--border-dim)', borderRadius: 4, padding: '0.2rem 0.55rem', cursor: 'pointer' }}>{streak} day streak 🔥</button>}
       </div>
 
+      {playIntro ? (
+        <IntroOverlay
+          p1={p1} p2={p2}
+          onDone={() => { localStorage.setItem(INTRO_KEY, '1'); setShowIntro(false); }}
+        />
+      ) : (
+      <>
       {/* Phrase rows */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
         {[p1, p2].map((phrase, pi) => {
@@ -1451,6 +1623,8 @@ export default function App() {
           </div>
         </div>
       </div>
+      </>
+      )}
 
       {showResult && (
         <ResultModal
